@@ -61,13 +61,15 @@ struct MenuPreview {
             let view = MenuContentView().environmentObject(state)
                 .environment(\.colorScheme, name == "dark" ? .dark : .light)
                 .environment(\.controlActiveState, .key)
-            let host = NSHostingView(rootView: view)
+            let host = NSHostingView(rootView: view.background(Color.clear))
             host.appearance = appearance
             _ = host.fittingSize
             // Let the view's async discovery finish before capturing empty/ready states.
             try await Task.sleep(nanoseconds: 100_000_000)
             host.frame = NSRect(origin: .zero, size: host.fittingSize)
             let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
+            window.isOpaque = false
+            window.backgroundColor = .clear
             window.appearance = appearance
             window.contentView = host
             try await Task.sleep(nanoseconds: 100_000_000)
@@ -84,6 +86,18 @@ struct MenuPreview {
             host.frame = NSRect(origin: .zero, size: size)
             host.layoutSubtreeIfNeeded()
             guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { fatalError("No bitmap") }
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            // The content must leave the system's glass visible, except when
+            // accessibility settings explicitly request an opaque surface.
+            let alpha = bitmap.colorAt(x: 4, y: 4)!.alphaComponent
+            let opaque = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency ||
+                         NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+            precondition(opaque ? alpha > 0.99 : alpha < 0.01,
+                         "Unexpected menu background opacity: \(name) \(alpha)")
+            // PNGs cannot capture the system's behind-window material. Render a
+            // neutral backdrop only for readable layout previews, after testing alpha.
+            host.rootView = view.background(Color(NSColor.windowBackgroundColor))
+            host.layoutSubtreeIfNeeded()
             host.cacheDisplay(in: host.bounds, to: bitmap)
             guard let png = bitmap.representation(using: .png, properties: [:]) else { fatalError("No PNG") }
             try png.write(to: destination.appendingPathComponent("\(name).png"))

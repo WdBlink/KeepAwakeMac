@@ -6,14 +6,13 @@ struct MenuContentView: View {
     @EnvironmentObject var state: AppState
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
 
     private var accent: Color {
         colorScheme == .dark ? Color(red: 0.48, green: 0.73, blue: 0.62) : Color(red: 0.20, green: 0.43, blue: 0.34)
     }
-    private var canvas: Color { Color(NSColor.windowBackgroundColor) }
-    private var surface: Color { Color(NSColor.controlBackgroundColor) }
-    private var secondary: Color { Color(NSColor.secondaryLabelColor) }
+    private var secondary: Color { .secondary }
     private var hairline: Color { Color.primary.opacity(contrast == .increased ? 0.3 : 0.1) }
 
     var body: some View {
@@ -24,11 +23,16 @@ struct MenuContentView: View {
         }
         .frame(width: 360)
         .frame(maxHeight: panelHeight)
-        .background(canvas)
+        // MenuBarExtra supplies the native glass. An opaque fill hides its material.
+        .background {
+            if reduceTransparency || contrast == .increased {
+                Color(NSColor.windowBackgroundColor)
+            }
+        }
         .tint(accent)
         .accentColor(accent)
         .font(.system(size: 12))
-        .foregroundStyle(Color(NSColor.labelColor))
+        .foregroundStyle(.primary)
         .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 1), value: state.anyAwake)
         .task(id: "\(state.triggerMode.rawValue):\(state.agent.rawValue)") {
             if state.triggerMode == .agentTask && state.canEditSettings { await state.refreshAgentTasks() }
@@ -38,14 +42,13 @@ struct MenuContentView: View {
     private var panelHeight: CGFloat { min(720, (NSScreen.main?.visibleFrame.height ?? 900) - 60) }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 16) {
             header
             VStack(alignment: .leading, spacing: 9) {
                 modeControls
                 Label("合盖优先熄屏，开盖恢复常亮。", systemImage: "info.circle")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(secondary)
-                    .padding(.horizontal, 2)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
                     .help("合盖保活时，内置与外接屏幕都会熄灭。屏幕常亮请求在开盖后恢复。")
             }
             stopConditions
@@ -59,7 +62,7 @@ struct MenuContentView: View {
             }
             footer
         }
-        .padding(20)
+        .padding(18)
     }
 
     private var header: some View {
@@ -116,7 +119,7 @@ struct MenuContentView: View {
                         .padding([.horizontal, .bottom], 14)
                 }
             }
-            Rectangle().fill(hairline).frame(height: 1).padding(.horizontal, 14)
+            Divider().padding(.leading, 35)
             modeRow(title: "屏幕常亮", subtitle: screenSubtitle, symbol: "sun.max",
                     isOn: Binding(get: { state.screenAwake }, set: { enabled in
                         Task { await state.setScreenAwake(enabled) }
@@ -126,8 +129,6 @@ struct MenuContentView: View {
                     .padding([.horizontal, .bottom], 14)
             }
         }
-        .background(surface, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(hairline, lineWidth: 1))
     }
 
     private func modeRow(title: String, subtitle: String, symbol: String, isOn: Binding<Bool>) -> some View {
@@ -135,13 +136,11 @@ struct MenuContentView: View {
             Image(systemName: symbol)
                 .font(.system(size: 17, weight: .regular))
                 .foregroundStyle(isOn.wrappedValue ? accent : secondary)
-                .frame(width: 36, height: 36)
-                .background(isOn.wrappedValue ? accent.opacity(0.10) : Color.primary.opacity(0.04),
-                            in: RoundedRectangle(cornerRadius: 10))
+                .frame(width: 24, height: 28)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.system(size: 13, weight: .semibold))
-                Text(subtitle).font(.system(size: 10.5)).foregroundStyle(secondary)
+                Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 6)
@@ -151,7 +150,7 @@ struct MenuContentView: View {
                 .disabled(state.isBusy)
                 .help(title == "合盖保活" ? "合盖后继续运行任务，同时关闭显示器" : "防止闲置熄屏与系统睡眠；合盖时让位于熄屏")
         }
-        .padding(14)
+        .padding(.vertical, 10)
     }
 
     private var lidSubtitle: String {
@@ -273,7 +272,7 @@ struct MenuContentView: View {
                         .frame(width: 38, height: 7)
                 }
                 .font(.system(size: 11)).padding(11)
-                .background(surface, in: RoundedRectangle(cornerRadius: 8))
+                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
                 .accessibilityLabel("正在读取任务")
             } else if let error = state.taskError {
                 failureNotice(title: "暂时无法读取任务，请刷新重试", message: error)
@@ -285,7 +284,7 @@ struct MenuContentView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(12)
-                .background(surface, in: RoundedRectangle(cornerRadius: 9))
+                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 9))
             } else {
                 Picker("等待的任务", selection: $state.selectedTaskID) {
                     ForEach(state.agentTasks) { Text($0.title).tag($0.id) }
