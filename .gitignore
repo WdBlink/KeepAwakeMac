@@ -1,0 +1,17 @@
+.DS_Store
+/build/
+/DerivedData/
+*.xcuserstate
+xcuserdata/
+*.dmg
+*.dmg.sha256
+*.zip
+*.log
+.env
+.env.*
+*.p12
+*.p8
+*.mobileprovision
+# Local handoff history and unfinished distribution prototype.
+/PROJECT_HANDOFF.md
+/packaging/homebrew-tap/

@@ -1,0 +1,20 @@
+name: macOS checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project and build
+        run: |
+          xcodegen generate
+          xcodebuild -project KeepAwakeMac.xcodeproj -scheme KeepAwakeMac -configuration Debug -derivedDataPath build ENABLE_HARDENED_RUNTIME=NO CODE_SIGN_IDENTITY=- build
+      - name: Run simulated power and task checks
+        run: bash scripts/check-helper.sh

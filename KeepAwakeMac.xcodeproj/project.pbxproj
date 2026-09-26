@@ -1,0 +1,532 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		01E83CE89CD770DFE6522546 /* Watchdog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD15EE953A3A3395F529AD17 /* Watchdog.swift */; };
+		15D22AC593F4443875EB640B /* PrivilegedHelperClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 508AAEC5F60E6438D2A75049 /* PrivilegedHelperClient.swift */; };
+		1D7D97A00F5D971191450A2C /* KAMHelper.xpc in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 34EC73EFA3741B2AC2893BEF /* KAMHelper.xpc */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		2690B9EA974639C984786694 /* LaunchAtLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AADD69BE09092B5F42DBB5D5 /* LaunchAtLogin.swift */; };
+		2E1D56E3A1FB2AAFDB29FA05 /* XPCProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DF45FB1274688B21885BD00 /* XPCProtocol.swift */; };
+		540BB584193852FFD0367836 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89EA202F0C2490863CFF1922 /* Constants.swift */; };
+		5F9C0536003465B7A45AC841 /* XPCProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DF45FB1274688B21885BD00 /* XPCProtocol.swift */; };
+		6294A55DFCE57C1A5F72943A /* com.local.KeepAwakeMac.Helper.plist in CopyFiles */ = {isa = PBXBuildFile; fileRef = 6B0D956E72D6642BDF1A2F0F /* com.local.KeepAwakeMac.Helper.plist */; };
+		6324121B124D19D0DC60A15A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B551F6C6D274F6901623F2EE /* Assets.xcassets */; };
+		7398C018A19CE00B02101502 /* AgentTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53C66259D48D01456332C787 /* AgentTask.swift */; };
+		78C643FE174A67782FEBD9BB /* KeepAwakeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCC3783DA61A4FAE50D66AC2 /* KeepAwakeController.swift */; };
+		93573F32751BC6C21A78AE3F /* ProcessScope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EAEC6BDE2F3FFC1302114DA /* ProcessScope.swift */; };
+		9A565379FD4DFE6D56BA9D56 /* MenuContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 378F706F3A84793591677891 /* MenuContentView.swift */; };
+		9CA943462710BB5DF880589D /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F56E3D46F49B11AC14B7FF3 /* AppState.swift */; };
+		A7260FB41686D2B0F197345D /* HelperMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3B1142D7EA749F484C2C95F /* HelperMain.swift */; };
+		D0CACFA6EC0B75DADFAA9DB5 /* KeepAwakeMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA88968EAF6F8DF72C204F1A /* KeepAwakeMacApp.swift */; };
+		E1583C26D50292568FA7A5E1 /* DisplayAwake.swift in Sources */ = {isa = PBXBuildFile; fileRef = F516CDBD1F170CEA8EE274B5 /* DisplayAwake.swift */; };
+		E666898F8D4B0FE8A4FFDC9E /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89EA202F0C2490863CFF1922 /* Constants.swift */; };
+		F84B4B515341067CB2F7AB3E /* HelperService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD6023FA30BD34353A1847BB /* HelperService.swift */; };
+		FF3530777543529DE80C1B21 /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E2A50559F9F7743572C8808 /* Settings.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		717CF6967A79569E11E2A25F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3C5745889BAD80493B295FE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EDA267D257E305EBC60DD794;
+			remoteInfo = KAMHelper;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		582A406A53F586FF1C6433F0 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchDaemons;
+			dstSubfolderSpec = 1;
+			files = (
+				6294A55DFCE57C1A5F72943A /* com.local.KeepAwakeMac.Helper.plist in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		73C061B6D101FA2595291453 /* Embed Dependencies */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				1D7D97A00F5D971191450A2C /* KAMHelper.xpc in Embed Dependencies */,
+			);
+			name = "Embed Dependencies";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		34EC73EFA3741B2AC2893BEF /* KAMHelper.xpc */ = {isa = PBXFileReference; explicitFileType = "wrapper.xpc-service"; includeInIndex = 0; path = KAMHelper.xpc; sourceTree = BUILT_PRODUCTS_DIR; };
+		378F706F3A84793591677891 /* MenuContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuContentView.swift; sourceTree = "<group>"; };
+		384142567F0F0BB7C0784E77 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		3FA4E29FF4F748D51B6797C4 /* KeepAwakeMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KeepAwakeMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		508AAEC5F60E6438D2A75049 /* PrivilegedHelperClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedHelperClient.swift; sourceTree = "<group>"; };
+		53C66259D48D01456332C787 /* AgentTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTask.swift; sourceTree = "<group>"; };
+		6B0D956E72D6642BDF1A2F0F /* com.local.KeepAwakeMac.Helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = com.local.KeepAwakeMac.Helper.plist; sourceTree = "<group>"; };
+		6EAEC6BDE2F3FFC1302114DA /* ProcessScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessScope.swift; sourceTree = "<group>"; };
+		7DF45FB1274688B21885BD00 /* XPCProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XPCProtocol.swift; sourceTree = "<group>"; };
+		89EA202F0C2490863CFF1922 /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
+		8F56E3D46F49B11AC14B7FF3 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		9E2A50559F9F7743572C8808 /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
+		AA88968EAF6F8DF72C204F1A /* KeepAwakeMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepAwakeMacApp.swift; sourceTree = "<group>"; };
+		AADD69BE09092B5F42DBB5D5 /* LaunchAtLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLogin.swift; sourceTree = "<group>"; };
+		ABAD3CA502DD8C1BF33F01D1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		B551F6C6D274F6901623F2EE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BD15EE953A3A3395F529AD17 /* Watchdog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Watchdog.swift; sourceTree = "<group>"; };
+		CCC3783DA61A4FAE50D66AC2 /* KeepAwakeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepAwakeController.swift; sourceTree = "<group>"; };
+		CD6023FA30BD34353A1847BB /* HelperService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperService.swift; sourceTree = "<group>"; };
+		E3B1142D7EA749F484C2C95F /* HelperMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperMain.swift; sourceTree = "<group>"; };
+		F516CDBD1F170CEA8EE274B5 /* DisplayAwake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayAwake.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0CDE3EC2575A298A5C530CC2 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				89EA202F0C2490863CFF1922 /* Constants.swift */,
+				7DF45FB1274688B21885BD00 /* XPCProtocol.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		3172A2893CC972C050981288 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				34EC73EFA3741B2AC2893BEF /* KAMHelper.xpc */,
+				3FA4E29FF4F748D51B6797C4 /* KeepAwakeMac.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		36FF66E6656BD1E3F5F38AA0 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				378F706F3A84793591677891 /* MenuContentView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		5D932A97836C6F6DE7257E43 /* Helper */ = {
+			isa = PBXGroup;
+			children = (
+				E3B1142D7EA749F484C2C95F /* HelperMain.swift */,
+				384142567F0F0BB7C0784E77 /* Info.plist */,
+				CCC3783DA61A4FAE50D66AC2 /* KeepAwakeController.swift */,
+			);
+			path = Helper;
+			sourceTree = "<group>";
+		};
+		93C9D863F87E353803499D63 = {
+			isa = PBXGroup;
+			children = (
+				9A4A48741177CE0242EAB22F /* App */,
+				5D932A97836C6F6DE7257E43 /* Helper */,
+				9548EBD91C139D1B94FB4D86 /* packaging */,
+				0CDE3EC2575A298A5C530CC2 /* Shared */,
+				3172A2893CC972C050981288 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		9548EBD91C139D1B94FB4D86 /* packaging */ = {
+			isa = PBXGroup;
+			children = (
+				6B0D956E72D6642BDF1A2F0F /* com.local.KeepAwakeMac.Helper.plist */,
+			);
+			path = packaging;
+			sourceTree = "<group>";
+		};
+		9A4A48741177CE0242EAB22F /* App */ = {
+			isa = PBXGroup;
+			children = (
+				36FF66E6656BD1E3F5F38AA0 /* Views */,
+				53C66259D48D01456332C787 /* AgentTask.swift */,
+				8F56E3D46F49B11AC14B7FF3 /* AppState.swift */,
+				B551F6C6D274F6901623F2EE /* Assets.xcassets */,
+				F516CDBD1F170CEA8EE274B5 /* DisplayAwake.swift */,
+				CD6023FA30BD34353A1847BB /* HelperService.swift */,
+				ABAD3CA502DD8C1BF33F01D1 /* Info.plist */,
+				AA88968EAF6F8DF72C204F1A /* KeepAwakeMacApp.swift */,
+				AADD69BE09092B5F42DBB5D5 /* LaunchAtLogin.swift */,
+				508AAEC5F60E6438D2A75049 /* PrivilegedHelperClient.swift */,
+				6EAEC6BDE2F3FFC1302114DA /* ProcessScope.swift */,
+				9E2A50559F9F7743572C8808 /* Settings.swift */,
+				BD15EE953A3A3395F529AD17 /* Watchdog.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		D9E723ACD974AEA74AE97456 /* KeepAwakeMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1CF819FA02B4B3882D5B0324 /* Build configuration list for PBXNativeTarget "KeepAwakeMac" */;
+			buildPhases = (
+				A6BBADDE1E247BF86E72EED7 /* Sources */,
+				672150249613498436F54C7C /* Resources */,
+				582A406A53F586FF1C6433F0 /* CopyFiles */,
+				73C061B6D101FA2595291453 /* Embed Dependencies */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				80CFDD12DEA5C6D46819FE96 /* PBXTargetDependency */,
+			);
+			name = KeepAwakeMac;
+			packageProductDependencies = (
+			);
+			productName = KeepAwakeMac;
+			productReference = 3FA4E29FF4F748D51B6797C4 /* KeepAwakeMac.app */;
+			productType = "com.apple.product-type.application";
+		};
+		EDA267D257E305EBC60DD794 /* KAMHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 80135F5B210F63C899C277BC /* Build configuration list for PBXNativeTarget "KAMHelper" */;
+			buildPhases = (
+				666D39E3818574CC801F3EC4 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = KAMHelper;
+			packageProductDependencies = (
+			);
+			productName = KAMHelper;
+			productReference = 34EC73EFA3741B2AC2893BEF /* KAMHelper.xpc */;
+			productType = "com.apple.product-type.xpc-service";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		3C5745889BAD80493B295FE4 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					D9E723ACD974AEA74AE97456 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					EDA267D257E305EBC60DD794 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = DDD0ECDF58C4E15EC62C7089 /* Build configuration list for PBXProject "KeepAwakeMac" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 93C9D863F87E353803499D63;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 3172A2893CC972C050981288 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D9E723ACD974AEA74AE97456 /* KeepAwakeMac */,
+				EDA267D257E305EBC60DD794 /* KAMHelper */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		672150249613498436F54C7C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6324121B124D19D0DC60A15A /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		666D39E3818574CC801F3EC4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E666898F8D4B0FE8A4FFDC9E /* Constants.swift in Sources */,
+				A7260FB41686D2B0F197345D /* HelperMain.swift in Sources */,
+				78C643FE174A67782FEBD9BB /* KeepAwakeController.swift in Sources */,
+				5F9C0536003465B7A45AC841 /* XPCProtocol.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A6BBADDE1E247BF86E72EED7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7398C018A19CE00B02101502 /* AgentTask.swift in Sources */,
+				9CA943462710BB5DF880589D /* AppState.swift in Sources */,
+				540BB584193852FFD0367836 /* Constants.swift in Sources */,
+				E1583C26D50292568FA7A5E1 /* DisplayAwake.swift in Sources */,
+				F84B4B515341067CB2F7AB3E /* HelperService.swift in Sources */,
+				D0CACFA6EC0B75DADFAA9DB5 /* KeepAwakeMacApp.swift in Sources */,
+				2690B9EA974639C984786694 /* LaunchAtLogin.swift in Sources */,
+				9A565379FD4DFE6D56BA9D56 /* MenuContentView.swift in Sources */,
+				15D22AC593F4443875EB640B /* PrivilegedHelperClient.swift in Sources */,
+				93573F32751BC6C21A78AE3F /* ProcessScope.swift in Sources */,
+				FF3530777543529DE80C1B21 /* Settings.swift in Sources */,
+				01E83CE89CD770DFE6522546 /* Watchdog.swift in Sources */,
+				2E1D56E3A1FB2AAFDB29FA05 /* XPCProtocol.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		80CFDD12DEA5C6D46819FE96 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EDA267D257E305EBC60DD794 /* KAMHelper */;
+			targetProxy = 717CF6967A79569E11E2A25F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		12E6E5D5D7A3AE1638963EDD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Helper/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.local.KeepAwakeMac.Helper;
+				PRODUCT_NAME = KAMHelper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		2EDB542F515CDBE55A434E8B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Helper/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.local.KeepAwakeMac.Helper;
+				PRODUCT_NAME = KAMHelper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		447BEF0F44D6A7E1A2B68905 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.10;
+			};
+			name = Release;
+		};
+		A15B9384D16A9912AA7BC8D3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.local.KeepAwakeMac;
+				PRODUCT_NAME = KeepAwakeMac;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		B6D502D6988E4AF681F440F4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.10;
+			};
+			name = Debug;
+		};
+		E0C7FA1EBC8987A532BC87BA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.local.KeepAwakeMac;
+				PRODUCT_NAME = KeepAwakeMac;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1CF819FA02B4B3882D5B0324 /* Build configuration list for PBXNativeTarget "KeepAwakeMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A15B9384D16A9912AA7BC8D3 /* Debug */,
+				E0C7FA1EBC8987A532BC87BA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		80135F5B210F63C899C277BC /* Build configuration list for PBXNativeTarget "KAMHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				12E6E5D5D7A3AE1638963EDD /* Debug */,
+				2EDB542F515CDBE55A434E8B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		DDD0ECDF58C4E15EC62C7089 /* Build configuration list for PBXProject "KeepAwakeMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B6D502D6988E4AF681F440F4 /* Debug */,
+				447BEF0F44D6A7E1A2B68905 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 3C5745889BAD80493B295FE4 /* Project object */;
+}
