@@ -4,21 +4,15 @@ import ServiceManagement
 /// Presentation only: both power modes retain AppState's shared stop rules.
 struct MenuContentView: View {
     @EnvironmentObject var state: AppState
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
 
-    private var accent: Color {
-        colorScheme == .dark ? Color(red: 0.48, green: 0.73, blue: 0.62) : Color(red: 0.20, green: 0.43, blue: 0.34)
-    }
     private var secondary: Color { .secondary }
     private var hairline: Color { Color.primary.opacity(contrast == .increased ? 0.3 : 0.1) }
 
     var body: some View {
         materialPanel
-            .tint(accent)
-            .accentColor(accent)
             .font(.system(size: 12))
             .foregroundStyle(.primary)
             .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 1), value: state.anyAwake)
@@ -95,7 +89,7 @@ struct MenuContentView: View {
         HStack(spacing: 10) {
             Image(systemName: "moon.zzz")
                 .font(.system(size: 20, weight: .regular))
-                .foregroundStyle(accent)
+                .foregroundStyle(.primary)
                 .frame(width: 26, height: 28)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
@@ -109,16 +103,9 @@ struct MenuContentView: View {
                 }
             }
             Spacer(minLength: 4)
-            HStack(spacing: 5) {
-                Circle().fill(state.anyAwake ? accent : Color.secondary.opacity(0.5))
-                    .frame(width: 5, height: 5)
-                Text(statusTitle)
-                    .font(.system(size: 10, weight: .medium))
-            }
-            .foregroundStyle(state.anyAwake ? accent : secondary)
-            .padding(.horizontal, 9).padding(.vertical, 6)
-            .background(state.anyAwake ? accent.opacity(0.10) : Color.primary.opacity(0.045), in: Capsule())
-            .accessibilityElement(children: .combine)
+            Text(statusTitle)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -157,7 +144,7 @@ struct MenuContentView: View {
         HStack(spacing: 11) {
             Image(systemName: symbol)
                 .font(.system(size: 17, weight: .regular))
-                .foregroundStyle(isOn.wrappedValue ? accent : secondary)
+                .foregroundStyle(isOn.wrappedValue ? Color.primary : secondary)
                 .frame(width: 24, height: 28)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
@@ -192,7 +179,7 @@ struct MenuContentView: View {
 
     private var permissionNotice: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "lock.shield").font(.system(size: 12)).foregroundStyle(accent)
+            Image(systemName: "lock.shield").font(.system(size: 12)).foregroundStyle(.secondary)
                 .padding(.top, 1).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text("需要允许后台活动").font(.system(size: 11, weight: .medium))
@@ -206,12 +193,12 @@ struct MenuContentView: View {
                     .frame(width: 28, height: 28)
             }
             .buttonStyle(QuietButtonStyle())
-            .foregroundStyle(accent)
+            .foregroundStyle(.primary)
             .accessibilityLabel("打开系统设置，允许 KeepAwakeMac 后台活动")
             .help("系统设置 → 通用 → 登录项与扩展 → 允许 KeepAwakeMac 后台活动")
         }
         .padding(10)
-        .background(accent.opacity(0.055), in: RoundedRectangle(cornerRadius: 9))
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 9))
         .padding(.horizontal, 10).padding(.bottom, 10)
     }
 
@@ -283,7 +270,7 @@ struct MenuContentView: View {
                 Button { Task { await state.refreshAgentTasks() } } label: {
                     Label("刷新", systemImage: "arrow.clockwise").font(.system(size: 10.5))
                 }
-                .buttonStyle(QuietButtonStyle()).foregroundStyle(accent)
+                .buttonStyle(QuietButtonStyle())
                 .disabled(state.loadingTasks)
                 .accessibilityLabel("刷新正在运行的 Agent 任务")
             }
