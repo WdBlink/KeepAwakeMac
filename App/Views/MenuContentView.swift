@@ -16,35 +16,57 @@ struct MenuContentView: View {
     private var hairline: Color { Color.primary.opacity(contrast == .increased ? 0.3 : 0.1) }
 
     var body: some View {
+        materialPanel
+            .tint(accent)
+            .accentColor(accent)
+            .font(.system(size: 12))
+            .foregroundStyle(.primary)
+            .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 1), value: state.anyAwake)
+            .task(id: "\(state.triggerMode.rawValue):\(state.agent.rawValue)") {
+                if state.triggerMode == .agentTask && state.canEditSettings { await state.refreshAgentTasks() }
+            }
+    }
+
+    @ViewBuilder
+    private var materialPanel: some View {
+        if #available(macOS 26.0, *) {
+            Group {
+                if reduceTransparency || contrast == .increased {
+                    panel.background(Color(NSColor.windowBackgroundColor), in: .rect(cornerRadius: 18))
+                } else {
+                    panel.glassEffect(.regular, in: .rect(cornerRadius: 18))
+                }
+            }
+            // Remove the legacy window material behind the single Liquid Glass layer.
+            .containerBackground(.clear, for: .window)
+        } else {
+            panel.background {
+                if reduceTransparency || contrast == .increased {
+                    Color(NSColor.windowBackgroundColor)
+                }
+            }
+        }
+    }
+
+    private var panel: some View {
         ViewThatFits(in: .vertical) {
             content
             ScrollView { content }
                 .frame(height: panelHeight)
         }
         .frame(width: 360)
-        .frame(maxHeight: panelHeight)
-        // MenuBarExtra supplies the native glass. An opaque fill hides its material.
-        .background {
-            if reduceTransparency || contrast == .increased {
-                Color(NSColor.windowBackgroundColor)
-            }
-        }
-        .tint(accent)
-        .accentColor(accent)
-        .font(.system(size: 12))
-        .foregroundStyle(.primary)
-        .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 1), value: state.anyAwake)
-        .task(id: "\(state.triggerMode.rawValue):\(state.agent.rawValue)") {
-            if state.triggerMode == .agentTask && state.canEditSettings { await state.refreshAgentTasks() }
-        }
+        .frame(maxHeight: panelHeight, alignment: .top)
+        // A menu window proposes its full available height. Keep the content's
+        // intrinsic height instead of centering it in a 720-point empty panel.
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var panelHeight: CGFloat { min(720, (NSScreen.main?.visibleFrame.height ?? 900) - 60) }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 10) {
             header
-            VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: 6) {
                 modeControls
                 Label("合盖优先熄屏，开盖恢复常亮。", systemImage: "info.circle")
                     .font(.system(size: 11))
@@ -62,24 +84,25 @@ struct MenuContentView: View {
             }
             footer
         }
-        .padding(18)
+        .padding(12)
     }
 
     private var header: some View {
         HStack(spacing: 10) {
             Image(systemName: "moon.zzz")
-                .font(.system(size: 23, weight: .light))
+                .font(.system(size: 20, weight: .regular))
                 .foregroundStyle(accent)
-                .frame(width: 34, height: 36)
+                .frame(width: 26, height: 28)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text("KeepAwakeMac")
-                    .font(.system(size: 16, weight: .semibold))
-                    .tracking(-0.5)
-                Text(headerSubtitle)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(secondary)
-                    .monospacedDigit()
+                    .font(.system(size: 14, weight: .semibold))
+                if state.anyAwake {
+                    Text("电量 \(state.batteryPercent)% · \(thermalText)")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(secondary)
+                        .monospacedDigit()
+                }
             }
             Spacer(minLength: 4)
             HStack(spacing: 5) {
@@ -93,11 +116,6 @@ struct MenuContentView: View {
             .background(state.anyAwake ? accent.opacity(0.10) : Color.primary.opacity(0.045), in: Capsule())
             .accessibilityElement(children: .combine)
         }
-    }
-
-    private var headerSubtitle: String {
-        if state.anyAwake { return "电量 \(state.batteryPercent)% · \(thermalText)" }
-        return "Mac 唤醒控制"
     }
 
     private var statusTitle: String {
@@ -150,7 +168,7 @@ struct MenuContentView: View {
                 .disabled(state.isBusy)
                 .help(title == "合盖保活" ? "合盖后继续运行任务，同时关闭显示器" : "防止闲置熄屏与系统睡眠；合盖时让位于熄屏")
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 6)
     }
 
     private var lidSubtitle: String {
@@ -206,15 +224,16 @@ struct MenuContentView: View {
     }
 
     private var stopConditions: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionHeading("停止条件", trailing: "同时作用于两种保活")
+        VStack(alignment: .leading, spacing: 6) {
             Picker(selection: $state.triggerMode) {
                 ForEach(AppState.TriggerMode.allCases) { Text(modeTitle($0)).tag($0) }
-            } label: { Text("结束时机").frame(width: 60, alignment: .leading) }
+            } label: { Text("停止条件").frame(width: 60, alignment: .leading) }
                 .pickerStyle(.menu).controlSize(.regular)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .disabled(!state.canEditSettings)
                 .accessibilityLabel("停止条件")
+                .accessibilityHint("同时作用于两种保活")
+                .help("所选停止条件同时关闭合盖保活和屏幕常亮。")
             if state.triggerMode == .timer {
                 HStack {
                     Text("持续时间").foregroundStyle(secondary)
@@ -305,7 +324,7 @@ struct MenuContentView: View {
     }
 
     private var safeguards: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 6) {
             sectionHeading("安全保护")
             HStack {
                 Label("最低电量", systemImage: "battery.25percent")
@@ -326,7 +345,7 @@ struct MenuContentView: View {
     }
 
     private var footer: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             Rectangle().fill(hairline).frame(height: 1)
             HStack {
                 Toggle("登录时启动", isOn: $state.launchAtLogin)

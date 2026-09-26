@@ -10,13 +10,12 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"></a>
 </p>
 
-KeepAwakeMac 面向 **Apple Silicon MacBook**，提供合盖保活、屏幕常亮，以及 Codex、Claude Code、mcode 指定任务结束后的自动停止。使用 SwiftUI、系统毛玻璃菜单和原生控件，没有第三方运行时依赖。启用“减少透明度”或“增强对比度”时，面板使用实色背景以保证可读性。
+KeepAwakeMac 面向 **Apple Silicon MacBook**，提供合盖保活、屏幕常亮，以及 Codex、Claude Code、mcode 指定任务结束后的自动停止。使用 SwiftUI 和原生控件，没有第三方运行时依赖。macOS 26 及以上使用 Apple 的 Liquid Glass，较早系统沿用标准菜单材质；启用“减少透明度”或“增强对比度”时使用实色背景。菜单按内容收紧，高度超出屏幕时才滚动。
 
 **当前为早期源码版本。** 最低构建目标是 macOS 13；当前实机验证环境为 Apple Silicon / macOS 27.0。尚无签名公证的安装包、Homebrew 安装入口或 Mac App Store 版本。其他系统版本和机型需要验证。
 
 <p align="center">
   <img src="docs/images/menu-light.png" width="340" alt="浅色界面：两种保活开关、停止条件、电量保护">
-  <img src="docs/images/menu-dark.png" width="340" alt="深色界面：后台活动授权提示与原生选择器">
 </p>
 <p align="center"><sub>真实 SwiftUI 视图的离屏布局预览，使用测试数据和中性底色；实际菜单的毛玻璃透色由 macOS 渲染，此处不是实机截图。</sub></p>
 
@@ -38,7 +37,7 @@ KeepAwakeMac 面向 **Apple Silicon MacBook**，提供合盖保活、屏幕常�
 
 ## 从源码安装
 
-需要完整的 **Xcode（Swift 5.10 或更新版本）**、XcodeGen，以及用于构建的 macOS。仅安装 Command Line Tools 不足以构建 App。
+需要完整的 **Xcode 26 或更新版本**（包含 Liquid Glass SDK）、XcodeGen，以及能运行该 Xcode 的 macOS。运行时最低目标仍为 macOS 13。仅安装 Command Line Tools 不足以构建 App。
 
 ```bash
 git clone https://github.com/WdBlink/KeepAwakeMac.git

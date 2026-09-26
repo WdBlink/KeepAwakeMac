@@ -29,7 +29,9 @@ App 每 5 秒发出心跳，helper 的会话租期为 20 秒，同时监视 App 
 
 ## 检查
 
-先按 README 构建 Debug 版本。`scripts/check-helper.sh` 使用匿名 XPC、模拟电源命令、固定电池快照和临时 Agent 记录，不需要后台授权，也不改变真实睡眠设置。`scripts/check-menu.sh` 渲染 10 种状态，并检查内容背景是否按当前辅助功能设置保留透明度；不捕获桌面、不执行真实电源操作。导出的布局 PNG 使用中性底色便于阅读，不能代替系统毛玻璃透色的实机验收。
+先按 README 构建 Debug 版本。`scripts/check-helper.sh` 使用匿名 XPC、模拟电源命令、固定电池快照和临时 Agent 记录，不需要后台授权，也不改变真实睡眠设置。`scripts/check-menu.sh` 渲染 10 种状态，模拟菜单窗口给出 720 点高度的布局提议，确认内容不会被拉高、默认状态高度不超过 350 点；不捕获桌面、不执行真实电源操作。导出的布局 PNG 使用中性底色便于阅读，不能代替 Liquid Glass 透色的实机验收。
+
+macOS 26+ 使用 `glassEffect(.regular)`，并通过 `containerBackground(.clear, for: .window)` 清除窗口原有背景，避免材质叠加。较早系统保留标准菜单材质；需要 Xcode 26+ 编译，CI 使用 Xcode 26.3。
 
 以下 Debug 诊断无需批准 root helper：
 
