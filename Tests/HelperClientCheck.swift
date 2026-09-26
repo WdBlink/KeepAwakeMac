@@ -1,4 +1,5 @@
 import Foundation
+import ServiceManagement
 
 // Uses an anonymous XPC service; never runs pmset or changes power settings.
 private final class TestHelper: NSObject, KAMHelperProtocol, NSXPCListenerDelegate {
@@ -37,6 +38,52 @@ private final class TestHelper: NSObject, KAMHelperProtocol, NSXPCListenerDelega
 
 @main
 struct HelperClientCheck {
+    @MainActor
+    static func checkServiceRegistration() async throws {
+        let suite = "KeepAwakeMac.registration-check.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var status: SMAppService.Status = .enabled // Stale, but still approved.
+        var registrations = 0
+        var removals = 0
+        var needsApproval = false
+        var failRemoval = false
+        var failRegistration = false
+        func prepare(_ identity: String) async throws {
+            try await HelperService.prepare(registrationID: identity, defaults: defaults,
+                status: { status }, register: {
+                    if failRegistration { throw HelperService.ServiceError("Test registration failure") }
+                    registrations += 1
+                    status = needsApproval ? .requiresApproval : .enabled
+                }, unregister: {
+                    if failRemoval { throw HelperService.ServiceError("Test removal failure") }
+                    removals += 1
+                    status = .notRegistered
+                })
+        }
+        try await prepare("build-1")
+        try await prepare("build-1")
+        precondition(registrations == 1 && removals == 1, "Repair stale registration only once")
+        try await prepare("build-2")
+        precondition(registrations == 2 && removals == 2, "An updated signature must refresh registration")
+        failRemoval = true
+        do { try await prepare("build-3"); fatalError("Removal failure was hidden") } catch {}
+        precondition(defaults.string(forKey: "helperRegistrationIdentity") == "build-2")
+        failRemoval = false; failRegistration = true
+        do { try await prepare("build-3"); fatalError("Registration failure was hidden") } catch {}
+        precondition(defaults.string(forKey: "helperRegistrationIdentity") == "build-2")
+        failRegistration = false; needsApproval = true
+        for _ in 0..<2 {
+            do { try await prepare("build-3"); fatalError("Approval was skipped") }
+            catch is HelperService.ApprovalRequired {} // Keep approval pending across retries.
+        }
+        precondition(registrations == 3 && removals == 3, "Pending approval must not cause re-registration")
+        status = .enabled
+        try await prepare("build-3")
+        precondition(registrations == 3 && removals == 3)
+        print("PASS: stale service repair, build changes, failure retry, and pending approval")
+    }
+
     static func expectError(_ fragment: String,
                             _ call: () async throws -> Bool) async {
         do {
@@ -49,6 +96,7 @@ struct HelperClientCheck {
 
     @MainActor
     static func main() async throws {
+        try await checkServiceRegistration()
         // Also bounds failures of the regression itself (e.g. a leaked continuation).
         DispatchQueue.global().asyncAfter(deadline: .now() + 30) {
             fputs("FAIL: XPC call or UI remained stuck\n", stderr)

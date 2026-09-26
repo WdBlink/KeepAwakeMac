@@ -31,7 +31,7 @@ App 每 5 秒发出心跳，helper 的会话租期为 20 秒，同时监视 App 
 
 先按 README 构建 Debug 版本。`scripts/check-helper.sh` 使用匿名 XPC、模拟电源命令、固定电池快照和临时 Agent 记录，不需要后台授权，也不改变真实睡眠设置。`scripts/check-menu.sh` 渲染 10 种状态，模拟菜单窗口给出 720 点高度的布局提议，确认内容不会被拉高、默认状态高度不超过 350 点；不捕获桌面、不执行真实电源操作。导出的布局 PNG 使用中性底色便于阅读，不能代替 Liquid Glass 透色的实机验收。
 
-macOS 26+ 使用 `glassEffect(.regular)`，并通过 `containerBackground(.clear, for: .window)` 清除窗口原有背景，避免材质叠加。较早系统保留标准菜单材质；需要 Xcode 26+ 编译，CI 使用 Xcode 26.3。
+macOS 26+ 使用 `glassEffect(.clear)`，按 Apple 文档添加 30% 黑色衬底并使用深色外观保证文字可读性，并通过 `containerBackground(.clear, for: .window)` 清除窗口原有背景，避免材质叠加。较早系统保留标准菜单材质；需要 Xcode 26+ 编译，CI 使用 Xcode 26.3。
 
 以下 Debug 诊断无需批准 root helper：
 
@@ -42,7 +42,7 @@ macOS 26+ 使用 `glassEffect(.regular)`，并通过 `containerBackground(.clear
 
 第一项读取本地任务状态；第二项短暂创建真实电源请求、确认后释放。运行前先退出通常运行的 App，避免混淆实例。
 
-下面的诊断会注册系统服务或改变实际睡眠状态，要求 App 已安装且后台服务获批。Debug 更新后服务未加载新 helper 时，才使用重新注册命令；重新注册可能要求再次批准。
+下面的诊断会注册系统服务或改变实际睡眠状态，要求 App 已安装且后台服务获批。App 会记录已登记构建的代码签名与安装路径，在更新后或迁移旧版本时先撤销旧登记，再登记当前服务；待批准状态不会反复登记。重新登记可能要求再次批准。只有同一构建的系统登记损坏时，才使用手动重新注册命令。
 
 ```bash
 /Applications/KeepAwakeMac.app/Contents/MacOS/KeepAwakeMac --reload-helper

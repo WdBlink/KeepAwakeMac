@@ -52,7 +52,7 @@ final class AppState: ObservableObject {
 
     private let helper: PrivilegedHelperClient
     private let display: DisplayAwake
-    private let prepareHelper: () throws -> Void
+    private let prepareHelper: () async throws -> Void
     private let agentHome: URL
     private let powerSnapshot: () -> (percent: Int, onAC: Bool)?
     private var watchdog: Watchdog?
@@ -63,7 +63,7 @@ final class AppState: ObservableObject {
     private var generation = 0
 
     init(helper: PrivilegedHelperClient = .shared,
-         prepareHelper: @escaping () throws -> Void = HelperService.prepare,
+         prepareHelper: @escaping () async throws -> Void = HelperService.prepare,
          display: DisplayAwake = DisplayAwake(),
          agentHome: URL = FileManager.default.homeDirectoryForCurrentUser,
          powerSnapshot: @escaping () -> (percent: Int, onAC: Bool)? = Watchdog.powerSnapshot) {
@@ -103,11 +103,15 @@ final class AppState: ObservableObject {
         guard status == .idle else { return }
         status = .deactivating
         do {
+            try await prepareHelper()
             if try await helper.isCurrentlyEnabled(), try await !helper.disable() {
                 throw HelperService.ServiceError("Could not reset keep-awake on launch")
             }
             status = .idle
-        } catch { status = .failed(error.localizedDescription) }
+        } catch {
+            needsHelperApproval = error is HelperService.ApprovalRequired
+            status = .failed(error.localizedDescription)
+        }
     }
 
     func toggle() async {
@@ -121,7 +125,8 @@ final class AppState: ObservableObject {
         status = .activating; needsHelperApproval = false; stopMessage = nil
         let operation = generation
         do {
-            try prepareHelper()
+            try await prepareHelper()
+            guard operation == generation, status == .activating else { return }
             try await startSessionMonitoring()
             guard operation == generation, status == .activating else { return }
             guard try await helper.enable() else { throw HelperService.ServiceError("The helper could not enable keep-awake.") }

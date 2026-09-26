@@ -34,11 +34,15 @@ struct MenuContentView: View {
                 if reduceTransparency || contrast == .increased {
                     panel.background(Color(NSColor.windowBackgroundColor), in: .rect(cornerRadius: 18))
                 } else {
-                    panel.glassEffect(.regular, in: .rect(cornerRadius: 18))
+                    panel
+                        .glassEffect(.clear, in: .rect(cornerRadius: 18))
+                        // Apple's clear glass needs a dimming layer for legibility.
+                        .background(.black.opacity(0.3), in: .rect(cornerRadius: 18))
                 }
             }
             // Remove the legacy window material behind the single Liquid Glass layer.
             .containerBackground(.clear, for: .window)
+            .preferredColorScheme(.dark)
         } else {
             panel.background {
                 if reduceTransparency || contrast == .increased {

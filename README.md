@@ -10,7 +10,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"></a>
 </p>
 
-KeepAwakeMac 面向 **Apple Silicon MacBook**，提供合盖保活、屏幕常亮，以及 Codex、Claude Code、mcode 指定任务结束后的自动停止。使用 SwiftUI 和原生控件，没有第三方运行时依赖。macOS 26 及以上使用 Apple 的 Liquid Glass，较早系统沿用标准菜单材质；启用“减少透明度”或“增强对比度”时使用实色背景。菜单按内容收紧，高度超出屏幕时才滚动。
+KeepAwakeMac 面向 **Apple Silicon MacBook**，提供合盖保活、屏幕常亮，以及 Codex、Claude Code、mcode 指定任务结束后的自动停止。使用 SwiftUI 和原生控件，没有第三方运行时依赖。macOS 26 及以上使用 Apple 的 Clear Liquid Glass、深色衬底与浅色文字，较早系统沿用标准菜单材质；启用“减少透明度”或“增强对比度”时使用实色背景。菜单按内容收紧，高度超出屏幕时才滚动。
 
 **当前为早期源码版本。** 最低构建目标是 macOS 13；当前实机验证环境为 Apple Silicon / macOS 27.0。尚无签名公证的安装包、Homebrew 安装入口或 Mac App Store 版本。其他系统版本和机型需要验证。
 

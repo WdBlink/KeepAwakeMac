@@ -63,7 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     if HelperService.service.status != .notRegistered {
                         try await HelperService.service.unregister()
                     }
-                    try HelperService.prepare()
+                    try await HelperService.prepare()
                     print("PASS: installed helper registered again")
                     exit(0)
                 } catch {
@@ -77,7 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ProcessInfo.processInfo.arguments.contains("--check-crash-cleanup") {
             Task { @MainActor in
                 do {
-                    try HelperService.prepare()
+                    try await HelperService.prepare()
                     let helper = PrivilegedHelperClient.shared
                     guard try await helper.enable(), try await helper.isCurrentlyEnabled() else {
                         throw HelperService.ServiceError("Enable/readback failed")
