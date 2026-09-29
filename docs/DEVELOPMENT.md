@@ -6,7 +6,7 @@
 | --- | --- |
 | `App/Views/MenuContentView.swift` | 原生 SwiftUI 菜单面板与选择器 |
 | `App/AppState.swift` | 两个独立开关、共用停止条件和状态协调 |
-| `App/DisplayAwake.swift` | 闲置系统 / 显示器保活请求，合盖优先级 |
+| `App/DisplayAwake.swift` | 闲置系统 / 显示器保活请求，开关开启即同时持有 |
 | `App/AgentTask.swift` | 本地 Agent 会话发现与完成状态解析 |
 | `App/Watchdog.swift` | 电池、充电与温度保护 |
 | `App/PrivilegedHelperClient.swift` | 有界超时的 XPC 客户端 |
@@ -19,9 +19,9 @@
 
 ## 电源生命周期
 
-合盖模式通过 `SMAppService.daemon` 登记嵌入 App 的 LaunchDaemon。root helper 校验连接方的代码签名要求，只接受固定的开启、关闭与查询操作，不接受调用方指定的命令或路径。屏幕模式直接持有本进程的 IOKit 请求。
+合盖模式通过 `SMAppService.daemon` 登记嵌入 App 的 LaunchDaemon。root helper 校验连接方的代码签名要求，只接受固定的开启、关闭、查询与显示保持操作，不接受调用方指定的命令或路径。屏幕模式直接持有本进程的 IOKit 请求。
 
-helper 每秒检查合盖状态，确认合盖后请求显示器休眠；每次合盖成功请求一次，失败会重试。开盖与未知状态不发出熄屏命令。屏幕模式每 0.5 秒采样，合盖或未知状态释放屏幕请求，保留系统闲置保活请求。
+helper 每秒检查合盖状态，确认合盖后请求显示器休眠；每次合盖成功请求一次，失败会重试。开盖与未知状态不发出熄屏命令。屏幕常亮开启时，App 立即并在整个切换期间持有系统与显示器两项 IOKit 请求（不再采样合盖状态），同时通过 `setDisplayHold` 告知 helper 暂停合盖熄屏；该保持归属于开关而非合盖会话，跨会话、租期失效与 helper 重启保留，直到 App 关闭开关、App 进程退出或下一次心跳重发。App 不参与合盖熄屏请求，因此 macOS 自身的合盖显示行为不受本工具影响。
 
 App 每 5 秒发出心跳，helper 的会话租期为 20 秒，同时监视 App 进程退出。root 所有的恢复标记位于 `/Library/Application Support/KeepAwakeMac/session-active`；helper 重启时尝试恢复残留的睡眠设置。其他工具已禁用睡眠时拒绝接管；这不能阻止其他工具在之后覆盖设置。
 

@@ -34,6 +34,14 @@ actor PrivilegedHelperClient {
         }
     }
 
+    /// Mirrors the screen-awake switch so the helper's lid-close display sleep
+    /// yields to it.
+    func setDisplayHold(_ held: Bool) async throws -> Bool {
+        try await request { proxy, reply in
+            proxy.setDisplayHold(held, reply: reply)
+        }
+    }
+
     private func request(
         _ send: (KAMHelperProtocol, @escaping (Bool, String?) -> Void) -> Void
     ) async throws -> Bool {

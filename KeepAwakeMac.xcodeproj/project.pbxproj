@@ -24,6 +24,7 @@
 		A7260FB41686D2B0F197345D /* HelperMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3B1142D7EA749F484C2C95F /* HelperMain.swift */; };
 		D0CACFA6EC0B75DADFAA9DB5 /* KeepAwakeMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA88968EAF6F8DF72C204F1A /* KeepAwakeMacApp.swift */; };
 		E1583C26D50292568FA7A5E1 /* DisplayAwake.swift in Sources */ = {isa = PBXBuildFile; fileRef = F516CDBD1F170CEA8EE274B5 /* DisplayAwake.swift */; };
+		E252A476223E5A4425A0AFF9 /* MenuCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74E3498B95C5C9E85B46414A /* MenuCopy.swift */; };
 		E666898F8D4B0FE8A4FFDC9E /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89EA202F0C2490863CFF1922 /* Constants.swift */; };
 		F84B4B515341067CB2F7AB3E /* HelperService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD6023FA30BD34353A1847BB /* HelperService.swift */; };
 		FF3530777543529DE80C1B21 /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E2A50559F9F7743572C8808 /* Settings.swift */; };
@@ -72,6 +73,7 @@
 		53C66259D48D01456332C787 /* AgentTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTask.swift; sourceTree = "<group>"; };
 		6B0D956E72D6642BDF1A2F0F /* com.local.KeepAwakeMac.Helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = com.local.KeepAwakeMac.Helper.plist; sourceTree = "<group>"; };
 		6EAEC6BDE2F3FFC1302114DA /* ProcessScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessScope.swift; sourceTree = "<group>"; };
+		74E3498B95C5C9E85B46414A /* MenuCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuCopy.swift; sourceTree = "<group>"; };
 		7DF45FB1274688B21885BD00 /* XPCProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XPCProtocol.swift; sourceTree = "<group>"; };
 		89EA202F0C2490863CFF1922 /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		8F56E3D46F49B11AC14B7FF3 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -155,6 +157,7 @@
 				ABAD3CA502DD8C1BF33F01D1 /* Info.plist */,
 				AA88968EAF6F8DF72C204F1A /* KeepAwakeMacApp.swift */,
 				AADD69BE09092B5F42DBB5D5 /* LaunchAtLogin.swift */,
+				74E3498B95C5C9E85B46414A /* MenuCopy.swift */,
 				508AAEC5F60E6438D2A75049 /* PrivilegedHelperClient.swift */,
 				6EAEC6BDE2F3FFC1302114DA /* ProcessScope.swift */,
 				9E2A50559F9F7743572C8808 /* Settings.swift */,
@@ -278,6 +281,7 @@
 				D0CACFA6EC0B75DADFAA9DB5 /* KeepAwakeMacApp.swift in Sources */,
 				2690B9EA974639C984786694 /* LaunchAtLogin.swift in Sources */,
 				9A565379FD4DFE6D56BA9D56 /* MenuContentView.swift in Sources */,
+				E252A476223E5A4425A0AFF9 /* MenuCopy.swift in Sources */,
 				15D22AC593F4443875EB640B /* PrivilegedHelperClient.swift in Sources */,
 				93573F32751BC6C21A78AE3F /* ProcessScope.swift in Sources */,
 				FF3530777543529DE80C1B21 /* Settings.swift in Sources */,

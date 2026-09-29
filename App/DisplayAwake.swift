@@ -5,14 +5,14 @@ import IOKit.pwr_mgt
 final class DisplayAwake {
     private var systemID: IOPMAssertionID = 0
     private var displayID: IOPMAssertionID = 0
-    private var timer: Timer?
+    // Unused. The display assertion no longer depends on the lid; this stays only
+    // because the injectable shape (lidClosed/create/release) is part of the
+    // type's contract. The helper is what reads the lid, on its own timer.
     private let lidClosed: () -> Bool?
     private let create: (String) throws -> IOPMAssertionID
     private let release: (IOPMAssertionID) -> Void
+    /// Both assertions are taken together, so this is the whole state.
     private(set) var isEnabled = false
-    private(set) var isDisplayHeld = false
-    var onChange: ((Bool) -> Void)?
-    var onError: ((Error) -> Void)?
 
     init(lidClosed: @escaping () -> Bool? = DisplayAwake.readLidClosed,
          create: @escaping (String) throws -> IOPMAssertionID = DisplayAwake.createAssertion,
@@ -27,37 +27,21 @@ final class DisplayAwake {
         do {
             systemID = try create(kIOPMAssertionTypePreventUserIdleSystemSleep)
             isEnabled = true
-            try updateLid()
-            let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
-                guard let self else { return }
-                do { try self.updateLid() }
-                catch { self.stop(); self.onError?(error) }
-            }
-            self.timer = timer
-            RunLoop.main.add(timer, forMode: .common)
+            // The explicit screen-awake switch outranks closed-lid display sleep,
+            // so the display assertion is held for as long as the switch is on.
+            // The helper separately stops issuing `pmset displaysleepnow`, which
+            // no assertion can override. Nothing here observes the lid, so there
+            // is no polling timer and no mid-session creation that could fail:
+            // a creation error surfaces as this method's throw.
+            displayID = try create(kIOPMAssertionTypePreventUserIdleDisplaySleep)
         } catch { stop(); throw error }
     }
 
-    func updateLid() throws {
-        // Unknown lid state also releases the display assertion. Closed-lid
-        // display sleep always takes priority over the screen-awake switch.
-        let shouldHold = isEnabled && lidClosed() == false
-        if shouldHold && !isDisplayHeld {
-            displayID = try create(kIOPMAssertionTypePreventUserIdleDisplaySleep)
-        } else if !shouldHold && isDisplayHeld {
-            release(displayID); displayID = 0
-        }
-        isDisplayHeld = shouldHold
-        onChange?(shouldHold)
-    }
-
     func stop() {
-        timer?.invalidate(); timer = nil
-        if isDisplayHeld { release(displayID) }
         if isEnabled { release(systemID) }
+        if displayID != 0 { release(displayID) }
         displayID = 0; systemID = 0
-        isDisplayHeld = false; isEnabled = false
-        onChange?(false)
+        isEnabled = false
     }
 
     deinit { stop() }

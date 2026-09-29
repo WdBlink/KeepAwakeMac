@@ -104,6 +104,62 @@ struct KeepAwakeCheck {
         precondition(displaySleeps == 3 && !enabled)
         print("PASS: lid-close display sleep, open/unknown state, retry, re-enable, and expiry")
 
+        try controller.enable(for: 123, now: 400)
+        lidClosed = true
+        try controller.sleepDisplayIfLidClosed()
+        precondition(displaySleeps == 4, "A closed lid blanks the display once")
+        controller.setDisplayHold(true)
+        try controller.sleepDisplayIfLidClosed()
+        precondition(displaySleeps == 4, "Screen-awake must outrank the closed-lid display sleep")
+        controller.setDisplayHold(false)
+        try controller.sleepDisplayIfLidClosed()
+        precondition(displaySleeps == 5, "A stale latch must not suppress the next closure")
+        lidClosed = false
+        controller.setDisplayHold(true)
+        try controller.sleepDisplayIfLidClosed()
+        precondition(displaySleeps == 5, "An open lid still must not blank the screen")
+        try controller.disable()
+        precondition(!enabled && controller.owner == nil)
+        print("PASS: screen-awake priority over the lid rule, latch reset, and the open-lid path")
+
+        // The reviews' regression: 屏幕常亮 on, 合盖保活 off and on again, lid closed.
+        // The hold belongs to the switch, not to the lid session, so the helper
+        // must still refuse to blank the screen.
+        lidClosed = true
+        controller.setDisplayHold(true, from: 123)
+        try controller.enable(for: 123, now: 600)
+        try controller.disable()
+        try controller.enable(for: 123, now: 700)
+        try controller.expireIfNeeded(now: 725)
+        try controller.enable(for: 123, now: 800)
+        precondition(controller.displayHoldOwner == 123 && enabled,
+                     "Only the app's own transition may end the hold, not a lid session")
+        try controller.sleepDisplayIfLidClosed()
+        precondition(displaySleeps == 5,
+                     "A lid-mode cycle must not re-arm displaysleepnow under an active screen-awake hold")
+        // Only the app's own transition, or its process exiting, ends the hold.
+        controller.setDisplayHold(false)
+        try controller.sleepDisplayIfLidClosed()
+        precondition(displaySleeps == 6, "Releasing the hold hands the lid rule back immediately")
+        try controller.disable()
+        precondition(!enabled && !FileManager.default.fileExists(atPath: marker.path))
+
+        // A hold left behind by an app that no longer exists must not suppress
+        // the closed-lid rule for the next launch. A live one must survive.
+        controller.setDisplayHold(true, from: getpid())
+        try controller.disable()
+        precondition(controller.displayHoldOwner == getpid(),
+                     "A session-less disable must not drop a live screen-awake hold")
+        let gone = Process()
+        gone.executableURL = URL(fileURLWithPath: "/usr/bin/true")
+        try gone.run()
+        gone.waitUntilExit()
+        controller.setDisplayHold(true, from: gone.processIdentifier)
+        try controller.disable()
+        precondition(controller.displayHoldOwner == nil,
+                     "A hold whose app has exited must not outlive it")
+        print("PASS: the screen-awake hold survives disable, lease expiry, and re-enable")
+
         enabled = true
         expectFailure { try controller.enable(for: 123) }
         try controller.disable()

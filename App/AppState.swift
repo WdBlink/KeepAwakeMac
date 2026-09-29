@@ -23,9 +23,11 @@ final class AppState: ObservableObject {
     @Published var status: Status = .idle
     @Published var needsHelperApproval = false
     @Published private(set) var screenAwake = false
-    @Published private(set) var screenHeld = false
     @Published private(set) var screenChanging = false
     @Published var screenError: String?
+    /// Set when the helper could not be told to stand down, so the closed lid may
+    /// still blank a screen the user asked to keep on.
+    @Published var screenWarning: String?
     @Published var stopMessage: String?
     @Published var agent: AgentTask.Agent = .codex
     @Published var selectedTaskID = ""
@@ -74,13 +76,6 @@ final class AppState: ObservableObject {
         triggerMode = s.triggerMode; timerHours = s.timerHours; processName = s.processName
         batteryFloorPercent = s.batteryFloorPercent; thermalAutoStopEnabled = s.thermalAutoStop
         launchAtLogin = s.launchAtLogin
-        display.onChange = { [weak self] held in self?.screenHeld = held }
-        display.onError = { [weak self] error in
-            guard let self else { return }
-            self.screenAwake = false
-            self.screenError = error.localizedDescription
-            if !self.status.isOn && self.status != .activating { self.stopSessionMonitoring() }
-        }
     }
 
     func refreshAgentTasks() async {
@@ -135,6 +130,10 @@ final class AppState: ObservableObject {
                 return
             }
             status = .active
+            // A new session must learn the current screen-awake state: the helper
+            // keeps the hold across session transitions, and re-sending covers a
+            // helper that restarted and lost it.
+            await tellHelperDisplayHold(screenAwake)
             heartbeatTask = Task { [weak self] in
                 while !Task.isCancelled {
                     do { try await Task.sleep(nanoseconds: 5_000_000_000) } catch { return }
@@ -144,6 +143,9 @@ final class AppState: ObservableObject {
                             await self.turnOffLid(reason: "Lid-close keep-awake ended")
                             return
                         }
+                        // Re-assert the hold so a restarted helper cannot leave the
+                        // screen blanking under a screen-awake session.
+                        await self.tellHelperDisplayHold(self.screenAwake)
                     } catch {
                         await self.turnOffLid(reason: "Lost connection to the keep-awake service")
                         return
@@ -161,19 +163,32 @@ final class AppState: ObservableObject {
     func setScreenAwake(_ enabled: Bool) async {
         guard !isBusy else { return }
         screenError = nil
+        // The disable path is busy too: each XPC call owns its own connection, so
+        // two overlapping relays would race and the last reply — not the last
+        // click — would decide what the helper believes.
+        screenChanging = true
+        defer { screenChanging = false }
+        let operation = generation
         if !enabled {
+            await tellHelperDisplayHold(false)
+            // A newer transition already told the helper what it believes.
+            guard operation == generation else { return }
             display.stop(); screenAwake = false
             if !status.isOn { stopSessionMonitoring() }
             return
         }
-        screenChanging = true; stopMessage = nil
-        defer { screenChanging = false }
-        let operation = generation
+        stopMessage = nil
         do {
             try await startSessionMonitoring()
             guard operation == generation else { return }
             try display.start()
             screenAwake = true
+            // Tell the helper only after the assertion exists: a slow or missing
+            // helper must never delay the switch taking effect on its own. An
+            // in-place update can leave an older daemon running that does not
+            // know this call, so refresh the registration first.
+            try? await prepareHelper()
+            await tellHelperDisplayHold(true)
         } catch {
             screenError = error.localizedDescription
             if !status.isOn { stopSessionMonitoring() }
@@ -185,8 +200,39 @@ final class AppState: ObservableObject {
         generation += 1
         stopMessage = reason
         display.stop(); screenAwake = false
+        await tellHelperDisplayHold(false)
         stopSessionMonitoring()
         if status != .idle { await turnOffLid(reason: reason) }
+    }
+
+    /// Keeps the helper's lid-close display sleep in step with this switch. The
+    /// hold only suppresses that blank, and screen-awake works without a helper
+    /// at all, so a failure here must not fail the switch. It is reported rather
+    /// than dropped: while a lid session runs, a lost hold means the closed lid
+    /// blanks a screen the user asked to keep on — their original symptom, with
+    /// no explanation otherwise. Never throws, so it cannot trip the heartbeat.
+    private func tellHelperDisplayHold(_ held: Bool) async {
+        do {
+            guard try await helper.setDisplayHold(held) else {
+                setScreenWarning(held ? "后台服务未确认屏幕常亮请求，合盖后仍可能熄屏。" : nil)
+                return
+            }
+            setScreenWarning(nil)
+        } catch {
+            guard held, status.isOn else {
+                // With no lid session the helper never blanks the display, so a
+                // missing or unapproved service is expected and only logged.
+                NSLog("KeepAwakeMac: screen-awake hold not delivered: %@", error.localizedDescription)
+                return
+            }
+            setScreenWarning("后台服务未接受屏幕常亮请求（\(error.localizedDescription)），合盖后仍可能熄屏。")
+        }
+    }
+
+    /// The heartbeat re-sends the hold every few seconds; skip the no-op writes so
+    /// an unchanged warning does not republish the menu on every tick.
+    private func setScreenWarning(_ message: String?) {
+        if screenWarning != message { screenWarning = message }
     }
 
     private func turnOffLid(reason: String) async {

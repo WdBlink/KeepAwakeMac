@@ -8,57 +8,82 @@ enum FeatureCheck {
         precondition(result)
     }
     @MainActor
-    static func run(client: PrivilegedHelperClient) async throws {
-        var closed: Bool? = false
+    static func run(client: PrivilegedHelperClient, displayHold: () -> Bool?,
+                    simulateHelperRestart: () -> Void) async throws {
+        // OUT-6: the retired rule must not reappear in any shipped string.
+        for phrase in MenuCopy.retired {
+            precondition(!MenuCopy.all.contains { $0.contains(phrase) },
+                         "Retired copy \"\(phrase)\" is back in the menu")
+        }
+        precondition(MenuCopy.precedence.contains("屏幕常亮优先") && MenuCopy.precedenceHelp.contains("不再请求合盖熄屏"),
+                     "The menu must state the switch outranks the closed-lid blank")
+        print("PASS: menu copy states the precedence and no longer promises the closed-lid rule")
+
+        // The display assertion no longer depends on the lid at all: take it once
+        // and account for every id created and released.
         var assertions: [IOPMAssertionID: String] = [:]
         var nextID: IOPMAssertionID = 0
+        var releases = 0
         var failDisplay = false
-        let display = DisplayAwake(lidClosed: { closed }, create: { type in
+        let display = DisplayAwake(create: { type in
             if failDisplay && type == kIOPMAssertionTypePreventUserIdleDisplaySleep {
                 throw HelperService.ServiceError("Test display failure")
             }
             nextID += 1; assertions[nextID] = type; return nextID
-        }, release: { assertions.removeValue(forKey: $0) })
+        }, release: { id in releases += 1; assertions.removeValue(forKey: id) })
         try display.start()
-        precondition(assertions.count == 2 && display.isDisplayHeld)
-        closed = true; try display.updateLid()
-        precondition(assertions.count == 1 && !display.isDisplayHeld)
-        closed = false; try display.updateLid()
-        precondition(assertions.count == 2 && display.isDisplayHeld)
-        closed = nil; try display.updateLid()
-        precondition(assertions.count == 1 && !display.isDisplayHeld)
+        precondition(assertions.count == 2 && display.isEnabled && releases == 0,
+                     "The switch must take both the system and the display assertion")
+        try display.start()
+        precondition(assertions.count == 2 && releases == 0, "Starting twice must not re-assert")
         display.stop(); display.stop()
-        precondition(assertions.isEmpty)
-        closed = false; failDisplay = true
+        precondition(assertions.isEmpty && releases == 2 && !display.isEnabled,
+                     "stop must release every held assertion exactly once")
+        failDisplay = true
         do { try display.start(); fatalError("Expected assertion creation failure") }
-        catch { precondition(assertions.isEmpty && !display.isEnabled) }
+        catch { precondition(assertions.isEmpty && !display.isEnabled, "A failed start must roll back") }
         failDisplay = false
-        print("PASS: screen/system assertions, closed/unknown lid priority, reopen, and failure cleanup")
+        print("PASS: both assertions taken once, released once, and rolled back on failure")
 
         let denied = AppState(helper: client, prepareHelper: { throw HelperService.ApprovalRequired() },
                               display: display, powerSnapshot: { (100, true) })
         denied.triggerMode = .manual; denied.batteryFloorPercent = 5; denied.thermalAutoStopEnabled = false
         await denied.setScreenAwake(true)
         precondition(denied.screenAwake && denied.status == .idle)
+        precondition(displayHold() == true, "The helper must be told to stop blanking a kept-awake screen")
         await denied.activate()
         precondition(denied.needsHelperApproval && denied.screenAwake, "Lid permission failure must not stop screen mode")
         await denied.setScreenAwake(false)
-        precondition(assertions.isEmpty)
+        precondition(assertions.isEmpty && displayHold() == false,
+                     "Turning the switch off must hand the lid rule back to the helper")
 
         let app = AppState(helper: client, prepareHelper: {}, display: display, powerSnapshot: { (100, true) })
         app.triggerMode = .manual; app.batteryFloorPercent = 5; app.thermalAutoStopEnabled = false
         await app.setScreenAwake(true)
         await app.activate()
         precondition(app.status == .active && app.screenAwake && !app.canEditSettings)
+        precondition(displayHold() == true, "Both switches on must keep the helper from blanking")
+        // The regression the reviews found: a lid-mode cycle must not leave the
+        // helper believing the closed lid may blank a screen the user keeps on.
         await app.toggle()
-        precondition(app.status == .idle && app.screenAwake, "Switching off lid mode must preserve screen mode")
+        precondition(app.status == .idle && app.screenAwake && displayHold() == true,
+                     "Switching lid mode off must preserve screen mode and its hold")
         await app.activate()
+        precondition(displayHold() == true, "A new lid session must re-assert the screen-awake hold")
+        // A restarted helper comes back with no hold in memory. Re-sending on
+        // every new session is what closes that window; nothing else would.
+        simulateHelperRestart()
+        precondition(displayHold() == nil)
+        await app.toggle()
+        await app.activate()
+        precondition(displayHold() == true, "A new lid session must re-assert a hold a restarted helper lost")
         await app.setScreenAwake(false)
-        precondition(app.status == .active && !app.screenAwake && assertions.isEmpty)
+        precondition(app.status == .active && !app.screenAwake && assertions.isEmpty && displayHold() == false)
         await app.setScreenAwake(true)
         await app.deactivate(reason: "Battery/thermal/timer stop")
         precondition(app.status == .idle && !app.screenAwake && assertions.isEmpty && app.canEditSettings)
-        print("PASS: independent switches, screen mode without helper approval, shared automatic stop")
+        precondition(displayHold() == false, "An automatic stop must also release the helper's display hold")
+        print("PASS: independent switches, hold across lid-mode cycles, helper approval gaps, shared automatic stop")
 
         let start: [String: Any] = ["type": "event_msg", "payload": ["type": "task_started"]]
         let finish: [String: Any] = ["type": "event_msg", "payload": ["type": "task_complete"]]

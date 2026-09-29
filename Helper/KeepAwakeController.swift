@@ -8,6 +8,8 @@ final class KeepAwakeController {
     private let readEnabled: () throws -> Bool
     private let lidClosed: () -> Bool?
     private var displaySleepRequested = false
+    private var displayHold = false
+    private(set) var displayHoldOwner: pid_t?
     private(set) var owner: pid_t?
     private var deadline: TimeInterval = 0
 
@@ -56,7 +58,13 @@ final class KeepAwakeController {
         if let pid = pid, let owner = owner, owner != pid {
             throw Failure("The active session belongs to another KeepAwakeMac process.")
         }
-        guard owner != nil || FileManager.default.fileExists(atPath: marker.path) else { return }
+        guard owner != nil || FileManager.default.fileExists(atPath: marker.path) else {
+            // No session, but a hold can still be set: 屏幕常亮 alone. Clear it
+            // here only if its app is gone, so a crashed or killed app cannot
+            // leave the closed-lid rule suppressed for the next launch.
+            if let pid = displayHoldOwner, kill(pid, 0) != 0 { setDisplayHold(false) }
+            return
+        }
         try setEnabled(false)
         if FileManager.default.fileExists(atPath: marker.path) {
             try FileManager.default.removeItem(at: marker)
@@ -64,6 +72,10 @@ final class KeepAwakeController {
         owner = nil
         deadline = 0
         displaySleepRequested = false
+        // displayHold deliberately survives: it belongs to the app's screen-awake
+        // switch, not to this lid session. Clearing it here would re-arm
+        // displaysleepnow while 屏幕常亮 is still on. The owning pid's exit watch
+        // and the app's own transitions are what clear it.
     }
 
     func currentState(for pid: pid_t, now: TimeInterval = ProcessInfo.processInfo.systemUptime) throws -> Bool {
@@ -92,10 +104,25 @@ final class KeepAwakeController {
         }
     }
 
+    /// The app's explicit screen-awake switch outranks the lid-close rule.
+    /// Turning the hold on clears the latch: a closure that already blanked the
+    /// screen must not suppress the next blank once the switch goes off again.
+    /// `from` is the requesting process, so a crash cannot leave the hold set.
+    func setDisplayHold(_ held: Bool, from pid: pid_t? = nil) {
+        if held {
+            displaySleepRequested = false
+            displayHold = true
+            displayHoldOwner = pid
+        } else {
+            displayHold = false
+            displayHoldOwner = nil
+        }
+    }
+
     /// Called by the existing one-second lease timer, only during our session.
     @discardableResult
     func sleepDisplayIfLidClosed() throws -> Bool {
-        guard owner != nil, let closed = lidClosed() else { return false }
+        guard owner != nil, !displayHold, let closed = lidClosed() else { return false }
         guard closed else {
             displaySleepRequested = false
             return false

@@ -45,8 +45,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 try display.start()
                 let types = ownedAssertions().compactMap { $0[kIOPMAssertionTypeKey] as? String }
+                // The display assertion must be held whenever the switch is on,
+                // closed lid included.
                 guard types.contains(kIOPMAssertionTypePreventUserIdleSystemSleep),
-                      !display.isDisplayHeld || types.contains(kIOPMAssertionTypePreventUserIdleDisplaySleep) else {
+                      types.contains(kIOPMAssertionTypePreventUserIdleDisplaySleep) else {
                     throw HelperService.ServiceError("System did not confirm the screen-awake assertions")
                 }
                 display.stop()

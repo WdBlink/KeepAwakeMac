@@ -57,6 +57,7 @@ final class KAMHelperDelegate: NSObject, NSXPCListenerDelegate {
     let queue = DispatchQueue(label: "com.local.KeepAwakeMac.power", qos: .userInitiated)
     let controller = KeepAwakeController()
     private var processMonitor: DispatchSourceProcess?
+    private var holdMonitor: DispatchSourceProcess?
 
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
         guard connection.effectiveUserIdentifier != 0 else { return false }
@@ -75,6 +76,27 @@ final class KAMHelperDelegate: NSObject, NSXPCListenerDelegate {
         }
         monitor.resume()
         processMonitor = monitor
+    }
+
+    /// The screen-awake hold outlives lid sessions, so it needs an owner watch of
+    /// its own: an app that crashes or is killed must not leave the helper
+    /// suppressing lid-close blanks forever.
+    func watchDisplayHold(_ pid: pid_t) {
+        holdMonitor?.cancel()
+        let monitor = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: queue)
+        monitor.setEventHandler { [weak self] in
+            guard let self = self, self.controller.displayHoldOwner == pid else { return }
+            self.controller.setDisplayHold(false)
+            self.holdMonitor?.cancel()
+            self.holdMonitor = nil
+        }
+        monitor.resume()
+        holdMonitor = monitor
+    }
+
+    func stopWatchingDisplayHold() {
+        holdMonitor?.cancel()
+        holdMonitor = nil
     }
 }
 
@@ -108,6 +130,22 @@ private final class KAMHelperSession: NSObject, KAMHelperProtocol {
         delegate.queue.async { [self] in
             do { reply(try delegate.controller.currentState(for: pid), nil) }
             catch { reply(false, error.localizedDescription) }
+        }
+    }
+
+    func setDisplayHold(_ held: Bool, reply: @escaping (Bool, String?) -> Void) {
+        delegate.queue.async { [self] in
+            if held {
+                guard kill(pid, 0) == 0 else {
+                    reply(false, "The requesting app has exited."); return
+                }
+                delegate.controller.setDisplayHold(true, from: pid)
+                delegate.watchDisplayHold(pid)
+            } else {
+                delegate.controller.setDisplayHold(false)
+                delegate.stopWatchingDisplayHold()
+            }
+            reply(true, nil)
         }
     }
 }

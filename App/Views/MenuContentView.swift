@@ -66,10 +66,10 @@ struct MenuContentView: View {
             header
             VStack(alignment: .leading, spacing: 6) {
                 modeControls
-                Label("合盖优先熄屏，开盖恢复常亮。", systemImage: "info.circle")
+                Label(MenuCopy.precedence, systemImage: "info.circle")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                    .help("合盖保活时，内置与外接屏幕都会熄灭。屏幕常亮请求在开盖后恢复。")
+                    .help(MenuCopy.precedenceHelp)
             }
             stopConditions
             safeguards
@@ -118,7 +118,8 @@ struct MenuContentView: View {
 
     private var modeControls: some View {
         VStack(spacing: 0) {
-            modeRow(title: "合盖保活", subtitle: lidSubtitle, symbol: "laptopcomputer",
+            modeRow(title: "合盖保活", subtitle: lidSubtitle, help: MenuCopy.lidHelp,
+                    symbol: "laptopcomputer",
                     isOn: Binding(get: { state.status.isOn }, set: { _ in Task { await state.toggle() } }))
             if case .failed(let message) = state.status {
                 if state.needsHelperApproval {
@@ -129,18 +130,23 @@ struct MenuContentView: View {
                 }
             }
             Divider().padding(.leading, 35)
-            modeRow(title: "屏幕常亮", subtitle: screenSubtitle, symbol: "sun.max",
+            modeRow(title: "屏幕常亮", subtitle: screenSubtitle, help: MenuCopy.screenHelp,
+                    symbol: "sun.max",
                     isOn: Binding(get: { state.screenAwake }, set: { enabled in
                         Task { await state.setScreenAwake(enabled) }
                     }))
             if let error = state.screenError {
                 failureNotice(title: "屏幕常亮未能开启", message: error)
                     .padding([.horizontal, .bottom], 14)
+            } else if let warning = state.screenWarning {
+                failureNotice(title: "合盖后仍可能熄屏", message: warning)
+                    .padding([.horizontal, .bottom], 14)
             }
         }
     }
 
-    private func modeRow(title: String, subtitle: String, symbol: String, isOn: Binding<Bool>) -> some View {
+    private func modeRow(title: String, subtitle: String, help: String, symbol: String,
+                         isOn: Binding<Bool>) -> some View {
         HStack(spacing: 11) {
             Image(systemName: symbol)
                 .font(.system(size: 17, weight: .regular))
@@ -157,24 +163,22 @@ struct MenuContentView: View {
                 .toggleStyle(.switch).controlSize(.small).labelsHidden()
                 .accessibilityLabel(title)
                 .disabled(state.isBusy)
-                .help(title == "合盖保活" ? "合盖后继续运行任务，同时关闭显示器" : "防止闲置熄屏与系统睡眠；合盖时让位于熄屏")
+                .help(help)
         }
         .padding(.vertical, 6)
     }
 
     private var lidSubtitle: String {
         switch state.status {
-        case .activating: return "正在开启，请稍候…"
-        case .deactivating: return "正在恢复正常睡眠…"
-        case .active: return "合上屏幕，任务继续运行"
-        default: return "合上屏幕，任务继续运行"
+        case .activating: return MenuCopy.lidActivating
+        case .deactivating: return MenuCopy.lidDeactivating
+        case .active: return MenuCopy.lidActive
+        default: return MenuCopy.lidActive
         }
     }
 
     private var screenSubtitle: String {
-        if state.screenChanging { return "正在开启，请稍候…" }
-        if state.screenAwake && !state.screenHeld { return "常亮已暂停 · 等待确认开盖" }
-        return "保持屏幕点亮，Mac 不自动睡眠"
+        state.screenChanging ? MenuCopy.screenChanging : MenuCopy.screenActive
     }
 
     private var permissionNotice: some View {

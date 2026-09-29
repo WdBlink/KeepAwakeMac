@@ -22,10 +22,16 @@ struct MenuPreview {
                 else { defaults.removeObject(forKey: key) }
             }
         }
+        // Screen-awake relays its state to the helper; point it at a service that
+        // does not exist so the preview stays offline.
+        let offlineHelper = PrivilegedHelperClient(timeout: 0.1) {
+            NSXPCConnection(machServiceName: "com.local.KeepAwakeMac.preview.\(UUID().uuidString)",
+                            options: .privileged)
+        }
         for name in ["idle", "permission", "timer", "agent-empty", "agent-ready", "working", "error", "active", "dark", "overflow"] {
             let appearance = NSAppearance(named: name == "dark" ? .darkAqua : .aqua)!
             application.appearance = appearance
-            let state = AppState(prepareHelper: { throw HelperService.ApprovalRequired() },
+            let state = AppState(helper: offlineHelper, prepareHelper: { throw HelperService.ApprovalRequired() },
                                  display: DisplayAwake(lidClosed: { false }, create: { _ in 1 }, release: { _ in }),
                                  agentHome: home, powerSnapshot: { (100, true) })
             state.triggerMode = .manual; state.batteryFloorPercent = 20; state.thermalAutoStopEnabled = true

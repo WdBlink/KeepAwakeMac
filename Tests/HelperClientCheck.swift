@@ -6,6 +6,8 @@ private final class TestHelper: NSObject, KAMHelperProtocol, NSXPCListenerDelega
     enum Behavior { case success, reject, disconnect, silent, lateReply }
     var behavior: Behavior = .success
     var replyDelay: TimeInterval = 0.4
+    var displayHold: Bool?
+    var rejectDisplayHold = false
 
     func listener(_ listener: NSXPCListener,
                   shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
@@ -34,6 +36,12 @@ private final class TestHelper: NSObject, KAMHelperProtocol, NSXPCListenerDelega
     }
 
     func currentState(reply: @escaping (Bool, String?) -> Void) { reply(false, nil) }
+
+    func setDisplayHold(_ held: Bool, reply: @escaping (Bool, String?) -> Void) {
+        guard !rejectDisplayHold else { reply(false, "Test helper rejected the display hold"); return }
+        displayHold = held
+        reply(true, nil)
+    }
 }
 
 @main
@@ -110,8 +118,9 @@ struct HelperClientCheck {
         await expectError("unavailable") { try await missing.enable() }
         await expectError("unavailable") { try await missing.disable() }
         await expectError("unavailable") { try await missing.isCurrentlyEnabled() }
+        await expectError("unavailable") { try await missing.setDisplayHold(true) }
         await expectError("unavailable") { try await missing.enable() }
-        print("PASS: missing service errors for enable, disable, state query, and retry")
+        print("PASS: missing service errors for enable, disable, state query, display hold, and retry")
 
         let helper = TestHelper()
         let listener = NSXPCListener.anonymous()
@@ -140,7 +149,11 @@ struct HelperClientCheck {
         helper.behavior = .success
         let retried = try await client.enable()
         precondition(retried)
-        print("PASS: replies, rejection, disconnect, timeout, late reply, and recovery")
+        let heldOn = try await client.setDisplayHold(true)
+        precondition(heldOn && helper.displayHold == true)
+        let heldOff = try await client.setDisplayHold(false)
+        precondition(heldOff && helper.displayHold == false)
+        print("PASS: replies, rejection, disconnect, timeout, late reply, recovery, and the display-hold relay")
 
         helper.behavior = .lateReply
         helper.replyDelay = 5.2
@@ -187,6 +200,48 @@ struct HelperClientCheck {
         await app.reconcileOnLaunch()
         guard case .failed = app.status else { fatalError("State query hid a transport error") }
         print("PASS: UI exits Working, exposes the error, and permits retry")
-        try await FeatureCheck.run(client: client)
+
+        // OUT-4: screen-awake must work with no helper at all. The relay fails,
+        // so it is only reported — never fatal, and never an error on the switch.
+        var soloAssertions = 0
+        let solo = AppState(helper: missing, prepareHelper: {},
+                            display: DisplayAwake(create: { _ in soloAssertions += 1; return 1 },
+                                                  release: { _ in soloAssertions -= 1 }),
+                            powerSnapshot: { (100, true) })
+        solo.triggerMode = .manual
+        solo.batteryFloorPercent = 5
+        solo.thermalAutoStopEnabled = false
+        await solo.setScreenAwake(true)
+        precondition(solo.screenAwake && solo.screenError == nil && soloAssertions == 2,
+                     "Screen-awake must not depend on the helper (OUT-4)")
+        precondition(solo.screenWarning == nil, "No lid session runs, so a lost hold is not a user-visible problem")
+        await solo.setScreenAwake(false)
+        precondition(!solo.screenAwake && soloAssertions == 0)
+        print("PASS: screen-awake works with no helper, and the lost hold stays silent")
+
+        // The same relay failing while a lid session is running is user-visible:
+        // a closed lid may still blank a screen the user asked to keep on.
+        helper.rejectDisplayHold = true
+        var warnedAssertions = 0
+        let warned = AppState(helper: client, prepareHelper: {},
+                              display: DisplayAwake(create: { _ in warnedAssertions += 1; return 1 },
+                                                    release: { _ in warnedAssertions -= 1 }),
+                              powerSnapshot: { (100, true) })
+        warned.triggerMode = .manual
+        warned.batteryFloorPercent = 5
+        warned.thermalAutoStopEnabled = false
+        await warned.setScreenAwake(true)
+        precondition(warned.screenAwake && warned.screenWarning == nil,
+                     "With no lid session a lost hold has no consequence to report")
+        await warned.activate()
+        precondition(warned.status == .active && warned.screenWarning != nil,
+                     "Under a lid session a lost hold must be surfaced, not swallowed")
+        precondition(warned.screenError == nil, "A lost hold is a warning, not a failed switch")
+        helper.rejectDisplayHold = false
+        await warned.setScreenAwake(false)
+        precondition(warned.screenWarning == nil && warnedAssertions == 0)
+        print("PASS: a lost hold is surfaced only while the lid rule can actually blank")
+        try await FeatureCheck.run(client: client, displayHold: { helper.displayHold },
+                                   simulateHelperRestart: { helper.displayHold = nil })
     }
 }
