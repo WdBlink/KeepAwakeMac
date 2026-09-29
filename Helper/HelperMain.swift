@@ -148,4 +148,8 @@ private final class KAMHelperSession: NSObject, KAMHelperProtocol {
             reply(true, nil)
         }
     }
+
+    func protocolInfo(reply: @escaping (Int) -> Void) {
+        delegate.queue.async { reply(AppConstants.helperProtocolVersion) }
+    }
 }

@@ -42,6 +42,39 @@ actor PrivilegedHelperClient {
         }
     }
 
+    /// The contract the running daemon implements. Throws when it is a build
+    /// that predates the call — which is the only way to tell one apart from a
+    /// daemon that is simply not there. Uses the error-handling proxy on
+    /// purpose: an unknown selector arrives as an `NSCocoaErrorDomain` 4097 on
+    /// that handler instead of raising in the caller.
+    func protocolVersion() async throws -> Int {
+        let connection = makeConnection()
+        var deadline: DispatchWorkItem?
+        defer {
+            deadline?.cancel()
+            connection.invalidate()
+        }
+        return try await withCheckedThrowingContinuation { continuation in
+            let reply = PendingVersionReply(continuation)
+            let unavailable = { reply.finish(.failure(HelperError.unavailable)) }
+            connection.remoteObjectInterface = NSXPCInterface(with: KAMHelperProtocol.self)
+            connection.invalidationHandler = unavailable
+            connection.interruptionHandler = unavailable
+            connection.resume()
+
+            let timeoutWork = DispatchWorkItem { reply.finish(.failure(HelperError.timedOut)) }
+            deadline = timeoutWork
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: timeoutWork)
+
+            let proxy = connection.remoteObjectProxyWithErrorHandler { _ in unavailable() }
+            guard let proxy = proxy as? KAMHelperProtocol else {
+                unavailable()
+                return
+            }
+            proxy.protocolInfo { version in reply.finish(.success(version)) }
+        }
+    }
+
     private func request(
         _ send: (KAMHelperProtocol, @escaping (Bool, String?) -> Void) -> Void
     ) async throws -> Bool {
@@ -110,6 +143,24 @@ actor PrivilegedHelperClient {
         }
 
         func finish(_ result: Result<Bool, Error>) {
+            lock.lock()
+            let pending = continuation
+            continuation = nil
+            lock.unlock()
+            pending?.resume(with: result)
+        }
+    }
+
+    /// Same exactly-once latch, for the reply shape `request` does not model.
+    private final class PendingVersionReply: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<Int, Error>?
+
+        init(_ continuation: CheckedContinuation<Int, Error>) {
+            self.continuation = continuation
+        }
+
+        func finish(_ result: Result<Int, Error>) {
             lock.lock()
             let pending = continuation
             continuation = nil

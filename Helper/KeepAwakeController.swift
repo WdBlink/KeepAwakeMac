@@ -12,6 +12,10 @@ final class KeepAwakeController {
     private(set) var displayHoldOwner: pid_t?
     private(set) var owner: pid_t?
     private var deadline: TimeInterval = 0
+    private var sessionStartedAt: TimeInterval = 0
+
+    /// How long a new session may not blank the screen. See `sleepDisplayIfLidClosed`.
+    static let settlingWindow: TimeInterval = 5
 
     init(marker: URL = URL(fileURLWithPath: "/Library/Application Support/KeepAwakeMac/session-active"),
          run: @escaping ([String]) throws -> String = KeepAwakeController.runPmset,
@@ -43,6 +47,7 @@ final class KeepAwakeController {
                                                     attributes: [.posixPermissions: 0o700])
             try validateMarkerDirectory()
             try Data("active\n".utf8).write(to: marker, options: .atomic)
+            sessionStartedAt = now
         }
         owner = pid
         deadline = now + 20
@@ -72,6 +77,7 @@ final class KeepAwakeController {
         owner = nil
         deadline = 0
         displaySleepRequested = false
+        sessionStartedAt = 0
         // displayHold deliberately survives: it belongs to the app's screen-awake
         // switch, not to this lid session. Clearing it here would re-arm
         // displaysleepnow while 屏幕常亮 is still on. The owning pid's exit watch
@@ -120,9 +126,20 @@ final class KeepAwakeController {
     }
 
     /// Called by the existing one-second lease timer, only during our session.
+    ///
+    /// A new session does not blank the display until its settling window has
+    /// passed. The lease timer starts at helper launch and ticks unconditionally,
+    /// so without the window the first tick after `enable()` blanks the screen —
+    /// before the user has finished opening the menu and turning 屏幕常亮 on, and
+    /// an explicit `displaysleepnow` is not undone by the assertion they are
+    /// about to take. The window is not a guess at when the app answers: the app
+    /// may already have said `hold = true`, which wins immediately, well inside
+    /// the window.
     @discardableResult
-    func sleepDisplayIfLidClosed() throws -> Bool {
-        guard owner != nil, !displayHold, let closed = lidClosed() else { return false }
+    func sleepDisplayIfLidClosed(now: TimeInterval = ProcessInfo.processInfo.systemUptime) throws -> Bool {
+        guard owner != nil, !displayHold else { return false }
+        guard now - sessionStartedAt >= Self.settlingWindow else { return false }
+        guard let closed = lidClosed() else { return false }
         guard closed else {
             displaySleepRequested = false
             return false

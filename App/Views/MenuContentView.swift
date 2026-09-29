@@ -139,7 +139,7 @@ struct MenuContentView: View {
                 failureNotice(title: "屏幕常亮未能开启", message: error)
                     .padding([.horizontal, .bottom], 14)
             } else if let warning = state.screenWarning {
-                failureNotice(title: "合盖后仍可能熄屏", message: warning)
+                failureNotice(title: MenuCopy.screenWarningTitle, message: warning)
                     .padding([.horizontal, .bottom], 14)
             }
         }
@@ -178,7 +178,8 @@ struct MenuContentView: View {
     }
 
     private var screenSubtitle: String {
-        state.screenChanging ? MenuCopy.screenChanging : MenuCopy.screenActive
+        guard state.screenChanging else { return MenuCopy.screenActive }
+        return state.screenChangingTo ? MenuCopy.screenEnabling : MenuCopy.screenDisabling
     }
 
     private var permissionNotice: some View {

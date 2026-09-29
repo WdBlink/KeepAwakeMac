@@ -20,3 +20,5 @@ jobs:
           xcodebuild -project KeepAwakeMac.xcodeproj -scheme KeepAwakeMac -configuration Debug -derivedDataPath build ENABLE_HARDENED_RUNTIME=NO CODE_SIGN_IDENTITY=- build
       - name: Run simulated power and task checks
         run: bash scripts/check-helper.sh
+      - name: Render every menu state and prove the warning banner is drawn
+        run: bash scripts/check-menu.sh "$(mktemp -d)"

@@ -7,16 +7,64 @@ enum FeatureCheck {
         let result = try value()
         precondition(result)
     }
+
+    /// OUT-6 is about the words a reader actually gets. Checking a hand-kept
+    /// enum cannot see a literal typed into the view, the state object, or a
+    /// document — which is exactly how the retired rule came back before. So
+    /// scan the shipped sources and documents themselves.
+    static func scanShippedCopy() throws {
+        let fm = FileManager.default
+        let roots = [URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent(),
+                     URL(fileURLWithPath: fm.currentDirectoryPath)]
+        guard let root = roots.first(where: {
+            fm.fileExists(atPath: $0.appendingPathComponent("App/MenuCopy.swift").path)
+        }) else {
+            preconditionFailure("Copy scan could not find the repository root (looked in \(roots.map(\.path)))")
+        }
+        var files: [URL] = []
+        for directory in ["App", "Helper", "Shared", "docs"] {
+            let url = root.appendingPathComponent(directory)
+            guard let walker = fm.enumerator(at: url, includingPropertiesForKeys: nil) else { continue }
+            var found = 0
+            for case let entry as URL in walker where entry.pathExtension == "swift" || entry.pathExtension == "md" {
+                // The deny-list itself is the one place these phrases belong.
+                if entry.lastPathComponent == "MenuCopy.swift" { continue }
+                files.append(entry); found += 1
+            }
+            precondition(found > 0, "The copy scan reached no files in \(directory); the root is probably wrong")
+        }
+        for name in ["README.md", "RELEASE_CHECKLIST.md", "SECURITY.md"] {
+            let url = root.appendingPathComponent(name)
+            precondition(fm.fileExists(atPath: url.path), "The copy scan cannot see \(name)")
+            files.append(url)
+        }
+        let texts = files.map { (url: $0, text: (try? String(contentsOf: $0, encoding: .utf8)) ?? "") }
+        for file in texts {
+            for phrase in MenuCopy.retired where file.text.contains(phrase) {
+                preconditionFailure("Retired copy \"\(phrase)\" is back in \(file.url.path)")
+            }
+        }
+        // A constant nobody renders is the same failure as a string nobody
+        // guards: the words exist and the user never sees them.
+        let shipped = texts.map(\.text).joined(separator: "\n")
+        for entry in MenuCopy.all {
+            precondition(shipped.contains("MenuCopy.\(entry.name)"),
+                         "MenuCopy.\(entry.name) is not referenced by any shipped source")
+            for phrase in MenuCopy.retired where entry.text.contains(phrase) {
+                preconditionFailure("Retired copy \"\(phrase)\" is back in MenuCopy.\(entry.name)")
+            }
+        }
+        // The one claim worth pinning is a subject, not a phrasing: the menu has
+        // to say the tool does not decide what macOS itself does with the lid.
+        precondition(MenuCopy.precedenceHelp.contains("macOS"),
+                     "The menu must not imply the tool overrides macOS's own lid blank")
+        print("PASS: the retired lid rule is absent from all \(files.count) shipped files, and every MenuCopy constant renders")
+    }
+
     @MainActor
     static func run(client: PrivilegedHelperClient, displayHold: () -> Bool?,
                     simulateHelperRestart: () -> Void) async throws {
-        // OUT-6: the retired rule must not reappear in any shipped string.
-        for phrase in MenuCopy.retired {
-            precondition(!MenuCopy.all.contains { $0.contains(phrase) },
-                         "Retired copy \"\(phrase)\" is back in the menu")
-        }
-        precondition(MenuCopy.precedence.contains("屏幕常亮优先") && MenuCopy.precedenceHelp.contains("不再请求合盖熄屏"),
-                     "The menu must state the switch outranks the closed-lid blank")
+        try scanShippedCopy()
         print("PASS: menu copy states the precedence and no longer promises the closed-lid rule")
 
         // The display assertion no longer depends on the lid at all: take it once

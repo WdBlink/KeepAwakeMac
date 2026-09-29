@@ -38,7 +38,7 @@ final class DisplayAwake {
     }
 
     func stop() {
-        if isEnabled { release(systemID) }
+        if systemID != 0 { release(systemID) }
         if displayID != 0 { release(displayID) }
         displayID = 0; systemID = 0
         isEnabled = false

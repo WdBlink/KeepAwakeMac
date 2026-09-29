@@ -110,17 +110,22 @@ struct KeepAwakeCheck {
         precondition(displaySleeps == 4, "A closed lid blanks the display once")
         controller.setDisplayHold(true)
         try controller.sleepDisplayIfLidClosed()
-        precondition(displaySleeps == 4, "Screen-awake must outrank the closed-lid display sleep")
+        precondition(displaySleeps == 4, "The tool must not request a lid blank while the switch holds the screen")
         controller.setDisplayHold(false)
         try controller.sleepDisplayIfLidClosed()
         precondition(displaySleeps == 5, "A stale latch must not suppress the next closure")
+        // The lid, not the hold, decides: with the hold off, an open lid takes the
+        // latch-reset branch, so the next closure blanks again. That branch is
+        // only reached when lidClosed() is actually consulted.
         lidClosed = false
-        controller.setDisplayHold(true)
         try controller.sleepDisplayIfLidClosed()
-        precondition(displaySleeps == 5, "An open lid still must not blank the screen")
+        precondition(displaySleeps == 5, "An open lid must not blank the screen")
+        lidClosed = true
+        try controller.sleepDisplayIfLidClosed()
+        precondition(displaySleeps == 6, "Reopening the lid must reset the latch so the next closure blanks")
         try controller.disable()
         precondition(!enabled && controller.owner == nil)
-        print("PASS: screen-awake priority over the lid rule, latch reset, and the open-lid path")
+        print("PASS: the screen-awake switch stops the lid blank, plus latch reset and the open-lid branch")
 
         // The reviews' regression: 屏幕常亮 on, 合盖保活 off and on again, lid closed.
         // The hold belongs to the switch, not to the lid session, so the helper
@@ -135,14 +140,37 @@ struct KeepAwakeCheck {
         precondition(controller.displayHoldOwner == 123 && enabled,
                      "Only the app's own transition may end the hold, not a lid session")
         try controller.sleepDisplayIfLidClosed()
-        precondition(displaySleeps == 5,
+        precondition(displaySleeps == 6,
                      "A lid-mode cycle must not re-arm displaysleepnow under an active screen-awake hold")
         // Only the app's own transition, or its process exiting, ends the hold.
         controller.setDisplayHold(false)
         try controller.sleepDisplayIfLidClosed()
-        precondition(displaySleeps == 6, "Releasing the hold hands the lid rule back immediately")
+        precondition(displaySleeps == 7, "Releasing the hold hands the lid rule back immediately")
         try controller.disable()
         precondition(!enabled && !FileManager.default.fileExists(atPath: marker.path))
+
+        // The ordering the reviews found: the lease timer is armed at helper
+        // launch and ticks unconditionally, so a blank could land the moment a
+        // session starts — before the user has finished turning 屏幕常亮 on, and
+        // an explicit displaysleepnow is not undone by the assertion they are
+        // about to take. A new session must not blank during its settling window.
+        lidClosed = true
+        try controller.enable(for: 123, now: 1000)
+        for tick in 0..<Int(KeepAwakeController.settlingWindow) {
+            try controller.sleepDisplayIfLidClosed(now: 1000 + Double(tick))
+        }
+        precondition(displaySleeps == 7,
+                     "The helper must not blank before the app has had a chance to state the hold")
+        controller.setDisplayHold(true)
+        try controller.sleepDisplayIfLidClosed(now: 1000 + KeepAwakeController.settlingWindow - 0.1)
+        precondition(displaySleeps == 7, "A hold that arrives inside the window still wins")
+        // The window is a settling delay, not an exemption: once it has passed
+        // the lid rule resumes on its own, so OUT-3 still holds.
+        controller.setDisplayHold(false)
+        try controller.sleepDisplayIfLidClosed(now: 1000 + KeepAwakeController.settlingWindow)
+        precondition(displaySleeps == 8, "Once settled, a closed lid blanks again as before")
+        try controller.disable()
+        print("PASS: a new lid session waits out its settling window before it may blank the screen")
 
         // A hold left behind by an app that no longer exists must not suppress
         // the closed-lid rule for the next launch. A live one must survive.

@@ -9,17 +9,33 @@ enum HelperService {
     static func prepare() async throws {
         try await prepare(registrationID: appIdentity(), defaults: .standard,
                           status: { service.status }, register: { try service.register() },
-                          unregister: { try await service.unregister() })
+                          unregister: { try await service.unregister() },
+                          runningProtocol: runningHelperProtocol)
+    }
+
+    /// The contract version the daemon that is actually running implements, or
+    /// nil when nothing answers this app's contract — either because no daemon
+    /// is up yet, or because the one that is up predates the call. Both mean the
+    /// registration cannot be trusted: the stored identity describes a bundle,
+    /// and launchd keeps running whatever binary it last launched from it.
+    private static func runningHelperProtocol() async -> Int? {
+        let client = PrivilegedHelperClient(timeout: 2)
+        return try? await client.protocolVersion()
     }
 
     // SMAppService.status describes approval, not whether launchd can still
-    // resolve this build. Ad-hoc updates change the containing app's signature.
+    // resolve this build. Ad-hoc updates change the containing app's signature,
+    // and a daemon launched from an older bundle keeps running under KeepAlive —
+    // so the running contract version is a second, independent staleness signal.
     static func prepare(registrationID: String, defaults: UserDefaults,
                         status: () -> SMAppService.Status,
                         register: () throws -> Void,
-                        unregister: () async throws -> Void) async throws {
+                        unregister: () async throws -> Void,
+                        runningProtocol: () async -> Int? = { AppConstants.helperProtocolVersion }
+    ) async throws {
         let key = "helperRegistrationIdentity"
-        let changed = defaults.string(forKey: key) != registrationID
+        let stale = await runningProtocol() != AppConstants.helperProtocolVersion
+        let changed = defaults.string(forKey: key) != registrationID || stale
         if changed && status() != .notRegistered && status() != .notFound {
             try await unregister()
         }

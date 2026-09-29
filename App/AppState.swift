@@ -24,6 +24,9 @@ final class AppState: ObservableObject {
     @Published var needsHelperApproval = false
     @Published private(set) var screenAwake = false
     @Published private(set) var screenChanging = false
+    /// Where the screen-awake switch is being moved. The menu must not say it is
+    /// being switched on while the user is switching it off.
+    @Published private(set) var screenChangingTo = false
     @Published var screenError: String?
     /// Set when the helper could not be told to stand down, so the closed lid may
     /// still blank a screen the user asked to keep on.
@@ -118,9 +121,19 @@ final class AppState: ObservableObject {
     func activate() async {
         guard status.canStart && !screenChanging else { return }
         status = .activating; needsHelperApproval = false; stopMessage = nil
+        // A fresh session must not inherit a warning about the previous one: the
+        // banner describes a state that no longer exists.
+        setScreenWarning(nil)
         let operation = generation
         do {
             try await prepareHelper()
+            guard operation == generation, status == .activating else { return }
+            // The hold belongs to the switch, not to a session, so it goes first.
+            // enable() and setDisplayHold() travel on separate connections, and the
+            // lease timer is unaligned: a tick landing between them would find the
+            // helper willing to blank. Saying it first removes that gap instead of
+            // narrowing it, and costs nothing when 屏幕常亮 is off.
+            await tellHelperDisplayHold(screenAwake, operation: operation)
             guard operation == generation, status == .activating else { return }
             try await startSessionMonitoring()
             guard operation == generation, status == .activating else { return }
@@ -133,7 +146,7 @@ final class AppState: ObservableObject {
             // A new session must learn the current screen-awake state: the helper
             // keeps the hold across session transitions, and re-sending covers a
             // helper that restarted and lost it.
-            await tellHelperDisplayHold(screenAwake)
+            await tellHelperDisplayHold(screenAwake, operation: operation)
             heartbeatTask = Task { [weak self] in
                 while !Task.isCancelled {
                     do { try await Task.sleep(nanoseconds: 5_000_000_000) } catch { return }
@@ -145,7 +158,7 @@ final class AppState: ObservableObject {
                         }
                         // Re-assert the hold so a restarted helper cannot leave the
                         // screen blanking under a screen-awake session.
-                        await self.tellHelperDisplayHold(self.screenAwake)
+                        await self.tellHelperDisplayHold(self.screenAwake, operation: self.generation)
                     } catch {
                         await self.turnOffLid(reason: "Lost connection to the keep-awake service")
                         return
@@ -163,17 +176,26 @@ final class AppState: ObservableObject {
     func setScreenAwake(_ enabled: Bool) async {
         guard !isBusy else { return }
         screenError = nil
+        // The banner describes a hold the helper did not take. Whatever ends that
+        // condition ends the banner — clearing it only as a side effect of a
+        // successful relay would leave it up forever, describing a switch that is
+        // now off.
+        setScreenWarning(nil)
         // The disable path is busy too: each XPC call owns its own connection, so
         // two overlapping relays would race and the last reply — not the last
         // click — would decide what the helper believes.
+        screenChangingTo = enabled
         screenChanging = true
         defer { screenChanging = false }
         let operation = generation
         if !enabled {
-            await tellHelperDisplayHold(false)
+            // The local release is the switch and is always available. Waiting on
+            // a helper the switch does not depend on would pin the screen awake
+            // for as long as that call takes — up to the full XPC deadline.
+            display.stop(); screenAwake = false
+            await tellHelperDisplayHold(false, operation: operation)
             // A newer transition already told the helper what it believes.
             guard operation == generation else { return }
-            display.stop(); screenAwake = false
             if !status.isOn { stopSessionMonitoring() }
             return
         }
@@ -188,7 +210,12 @@ final class AppState: ObservableObject {
             // in-place update can leave an older daemon running that does not
             // know this call, so refresh the registration first.
             try? await prepareHelper()
-            await tellHelperDisplayHold(true)
+            // An automatic stop — battery, heat, the timer, the watched process,
+            // Quit — can land while `prepareHelper` is suspended, and it has
+            // already said `hold = false`. Re-asserting here would resume behind
+            // it and leave the helper suppressing a blank the app no longer wants.
+            guard operation == generation else { display.stop(); return }
+            await tellHelperDisplayHold(true, operation: operation)
         } catch {
             screenError = error.localizedDescription
             if !status.isOn { stopSessionMonitoring() }
@@ -198,9 +225,11 @@ final class AppState: ObservableObject {
     /// All automatic stop rules (and Quit) stop both switches together.
     func deactivate(reason: String) async {
         generation += 1
+        let operation = generation
         stopMessage = reason
+        setScreenWarning(nil)
         display.stop(); screenAwake = false
-        await tellHelperDisplayHold(false)
+        await tellHelperDisplayHold(false, operation: operation)
         stopSessionMonitoring()
         if status != .idle { await turnOffLid(reason: reason) }
     }
@@ -211,7 +240,13 @@ final class AppState: ObservableObject {
     /// than dropped: while a lid session runs, a lost hold means the closed lid
     /// blanks a screen the user asked to keep on — their original symptom, with
     /// no explanation otherwise. Never throws, so it cannot trip the heartbeat.
-    private func tellHelperDisplayHold(_ held: Bool) async {
+    ///
+    /// `operation` is the generation the caller decided under. Relays travel on
+    /// independent connections that NSXPC does not order against each other, so
+    /// a relay decided before a newer transition would land behind it and undo
+    /// it. Dropping here is free: the newer transition always sends its own.
+    private func tellHelperDisplayHold(_ held: Bool, operation: Int) async {
+        guard operation == generation else { return }
         do {
             guard try await helper.setDisplayHold(held) else {
                 setScreenWarning(held ? "后台服务未确认屏幕常亮请求，合盖后仍可能熄屏。" : nil)
@@ -238,6 +273,10 @@ final class AppState: ObservableObject {
     private func turnOffLid(reason: String) async {
         guard status != .deactivating else { return }
         status = .deactivating
+        // No lid session means the helper cannot blank the display, so whatever
+        // the banner warned about has stopped being true. Nothing else clears it:
+        // the heartbeat is about to be cancelled with the session.
+        setScreenWarning(nil)
         heartbeatTask?.cancel(); heartbeatTask = nil
         do {
             status = try await helper.disable() ? .idle : .failed("Could not turn off (\(reason))")
