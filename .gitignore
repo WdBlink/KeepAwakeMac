@@ -15,3 +15,4 @@ xcuserdata/
 # Local handoff history and unfinished distribution prototype.
 /PROJECT_HANDOFF.md
 /packaging/homebrew-tap/
+/.multica/

@@ -101,8 +101,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         #endif
-        if HelperService.service.status == .enabled {
-            Task { await AppState.shared.reconcileOnLaunch() }
+        Task { @MainActor in
+            if HelperService.service.status == .enabled {
+                await AppState.shared.reconcileOnLaunch()
+            }
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--screen-awake") {
+                await AppState.shared.setScreenAwake(true)
+            }
+            #endif
         }
     }
 

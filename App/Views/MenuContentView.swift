@@ -344,7 +344,7 @@ struct MenuContentView: View {
         VStack(spacing: 8) {
             Rectangle().fill(hairline).frame(height: 1)
             HStack {
-                Toggle("登录时启动", isOn: $state.launchAtLogin)
+                Toggle("登录时启动", isOn: Binding(get: { state.launchAtLogin }, set: { state.setLaunchAtLogin($0) }))
                     .toggleStyle(.checkbox).controlSize(.small)
                     .font(.system(size: 10.5)).foregroundStyle(secondary)
                 Spacer()
@@ -359,6 +359,12 @@ struct MenuContentView: View {
                 .buttonStyle(QuietButtonStyle()).foregroundStyle(secondary)
                 .keyboardShortcut("q")
                 .accessibilityLabel("退出 KeepAwakeMac")
+            }
+            if let error = state.loginError {
+                Label(error, systemImage: "exclamationmark.circle")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

@@ -5,19 +5,13 @@ import IOKit.pwr_mgt
 final class DisplayAwake {
     private var systemID: IOPMAssertionID = 0
     private var displayID: IOPMAssertionID = 0
-    // Unused. The display assertion no longer depends on the lid; this stays only
-    // because the injectable shape (lidClosed/create/release) is part of the
-    // type's contract. The helper is what reads the lid, on its own timer.
-    private let lidClosed: () -> Bool?
     private let create: (String) throws -> IOPMAssertionID
     private let release: (IOPMAssertionID) -> Void
     /// Both assertions are taken together, so this is the whole state.
     private(set) var isEnabled = false
 
-    init(lidClosed: @escaping () -> Bool? = DisplayAwake.readLidClosed,
-         create: @escaping (String) throws -> IOPMAssertionID = DisplayAwake.createAssertion,
+    init(create: @escaping (String) throws -> IOPMAssertionID = DisplayAwake.createAssertion,
          release: @escaping (IOPMAssertionID) -> Void = { IOPMAssertionRelease($0) }) {
-        self.lidClosed = lidClosed
         self.create = create
         self.release = release
     }
@@ -45,14 +39,6 @@ final class DisplayAwake {
     }
 
     deinit { stop() }
-
-    static func readLidClosed() -> Bool? {
-        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
-        guard service != 0 else { return nil }
-        defer { IOObjectRelease(service) }
-        return IORegistryEntryCreateCFProperty(service, "AppleClamshellState" as CFString,
-                                               kCFAllocatorDefault, 0)?.takeRetainedValue() as? Bool
-    }
 
     private static func createAssertion(_ type: String) throws -> IOPMAssertionID {
         var id: IOPMAssertionID = 0

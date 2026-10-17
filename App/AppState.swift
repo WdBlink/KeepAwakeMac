@@ -24,6 +24,7 @@ final class AppState: ObservableObject {
     @Published var needsHelperApproval = false
     @Published private(set) var screenAwake = false
     @Published private(set) var screenChanging = false
+    @Published private(set) var isStopping = false
     /// Where the screen-awake switch is being moved. The menu must not say it is
     /// being switched on while the user is switching it off.
     @Published private(set) var screenChangingTo = false
@@ -42,17 +43,13 @@ final class AppState: ObservableObject {
     @Published var processName: String { didSet { Settings.shared.processName = processName } }
     @Published var batteryFloorPercent: Int { didSet { Settings.shared.batteryFloorPercent = batteryFloorPercent } }
     @Published var thermalAutoStopEnabled: Bool { didSet { Settings.shared.thermalAutoStop = thermalAutoStopEnabled } }
-    @Published var launchAtLogin: Bool {
-        didSet {
-            Settings.shared.launchAtLogin = launchAtLogin
-            LaunchAtLoginService.shared.setEnabled(launchAtLogin)
-        }
-    }
+    @Published private(set) var launchAtLogin: Bool
+    @Published private(set) var loginError: String?
     @Published var batteryPercent = 100
     @Published var thermalState: ProcessInfo.ThermalState = .nominal
 
     var anyAwake: Bool { status.isOn || screenAwake }
-    var isBusy: Bool { status == .activating || status == .deactivating || screenChanging }
+    var isBusy: Bool { status == .activating || status == .deactivating || screenChanging || isStopping }
     var canEditSettings: Bool { !anyAwake && !isBusy }
 
     private let helper: PrivilegedHelperClient
@@ -60,6 +57,7 @@ final class AppState: ObservableObject {
     private let prepareHelper: () async throws -> Void
     private let agentHome: URL
     private let powerSnapshot: () -> (percent: Int, onAC: Bool)?
+    private let setLoginEnabled: (Bool) -> Bool
     private var watchdog: Watchdog?
     private var processScope: ProcessScope?
     private var timerTask: Task<Void, Never>?
@@ -71,14 +69,27 @@ final class AppState: ObservableObject {
          prepareHelper: @escaping () async throws -> Void = HelperService.prepare,
          display: DisplayAwake = DisplayAwake(),
          agentHome: URL = FileManager.default.homeDirectoryForCurrentUser,
-         powerSnapshot: @escaping () -> (percent: Int, onAC: Bool)? = Watchdog.powerSnapshot) {
+         powerSnapshot: @escaping () -> (percent: Int, onAC: Bool)? = Watchdog.powerSnapshot,
+         loginIsEnabled: () -> Bool = { LaunchAtLoginService.shared.isEnabled },
+         setLoginEnabled: @escaping (Bool) -> Bool = { LaunchAtLoginService.shared.setEnabled($0) }) {
         self.helper = helper; self.prepareHelper = prepareHelper; self.display = display
         self.agentHome = agentHome
         self.powerSnapshot = powerSnapshot
+        self.setLoginEnabled = setLoginEnabled
         let s = Settings.shared
         triggerMode = s.triggerMode; timerHours = s.timerHours; processName = s.processName
         batteryFloorPercent = s.batteryFloorPercent; thermalAutoStopEnabled = s.thermalAutoStop
-        launchAtLogin = s.launchAtLogin
+        launchAtLogin = loginIsEnabled()
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        loginError = nil
+        if setLoginEnabled(enabled) {
+            launchAtLogin = enabled
+        } else {
+            loginError = "无法更改登录启动，请在系统设置的登录项中检查 KeepAwakeMac。"
+        }
+        Settings.shared.launchAtLogin = launchAtLogin
     }
 
     func refreshAgentTasks() async {
@@ -119,7 +130,7 @@ final class AppState: ObservableObject {
     }
 
     func activate() async {
-        guard status.canStart && !screenChanging else { return }
+        guard status.canStart && !isBusy else { return }
         status = .activating; needsHelperApproval = false; stopMessage = nil
         // A fresh session must not inherit a warning about the previous one: the
         // banner describes a state that no longer exists.
@@ -158,7 +169,9 @@ final class AppState: ObservableObject {
                         }
                         // Re-assert the hold so a restarted helper cannot leave the
                         // screen blanking under a screen-awake session.
-                        await self.tellHelperDisplayHold(self.screenAwake, operation: self.generation)
+                        if !self.screenChanging {
+                            await self.tellHelperDisplayHold(self.screenAwake, operation: self.generation)
+                        }
                     } catch {
                         await self.turnOffLid(reason: "Lost connection to the keep-awake service")
                         return
@@ -200,30 +213,43 @@ final class AppState: ObservableObject {
             return
         }
         stopMessage = nil
+        let coordinatingLidSession = status.isOn
         do {
             try await startSessionMonitoring()
             guard operation == generation else { return }
+            // An active helper may blank at any tick, even after the five-second
+            // window. Keep the switch pending until it has accepted the hold.
+            if coordinatingLidSession {
+                await tellHelperDisplayHold(true, operation: operation)
+                guard operation == generation else { return }
+            }
             try display.start()
             screenAwake = true
-            // Tell the helper only after the assertion exists: a slow or missing
-            // helper must never delay the switch taking effect on its own. An
+            // Without a lid session, take the assertion first so a slow or missing
+            // helper never delays independent screen mode. An
             // in-place update can leave an older daemon running that does not
             // know this call, so refresh the registration first.
-            try? await prepareHelper()
+            if !coordinatingLidSession { try? await prepareHelper() }
             // An automatic stop — battery, heat, the timer, the watched process,
             // Quit — can land while `prepareHelper` is suspended, and it has
             // already said `hold = false`. Re-asserting here would resume behind
             // it and leave the helper suppressing a blank the app no longer wants.
             guard operation == generation else { display.stop(); return }
-            await tellHelperDisplayHold(true, operation: operation)
+            if !coordinatingLidSession { await tellHelperDisplayHold(true, operation: operation) }
         } catch {
             screenError = error.localizedDescription
+            if coordinatingLidSession {
+                await tellHelperDisplayHold(false, operation: operation)
+            }
             if !status.isOn { stopSessionMonitoring() }
         }
     }
 
     /// All automatic stop rules (and Quit) stop both switches together.
     func deactivate(reason: String) async {
+        guard !isStopping else { return }
+        isStopping = true
+        defer { isStopping = false }
         generation += 1
         let operation = generation
         stopMessage = reason

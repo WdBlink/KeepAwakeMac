@@ -6,6 +6,7 @@
 | --- | --- |
 | `App/Views/MenuContentView.swift` | 原生 SwiftUI 菜单面板与选择器 |
 | `App/AppState.swift` | 两个独立开关、共用停止条件和状态协调 |
+| `App/MenuCopy.swift` | 两种模式的文案与保证范围 |
 | `App/DisplayAwake.swift` | 闲置系统 / 显示器保活请求，开关开启即同时持有 |
 | `App/AgentTask.swift` | 本地 Agent 会话发现与完成状态解析 |
 | `App/Watchdog.swift` | 电池、充电与温度保护 |
@@ -21,7 +22,19 @@
 
 合盖模式通过 `SMAppService.daemon` 登记嵌入 App 的 LaunchDaemon。root helper 校验连接方的代码签名要求，只接受固定的开启、关闭、查询与显示保持操作，不接受调用方指定的命令或路径。屏幕模式直接持有本进程的 IOKit 请求。
 
-helper 每秒检查合盖状态，确认合盖后请求显示器休眠；每次合盖成功请求一次，失败会重试。新会话开始后的 5 秒静默期内不请求熄屏，给 App 把屏幕常亮状态送达 helper 的机会——租约定时器在 helper 启动时就开始无条件触发，App 只能在自己的回合里说明它是否保持屏幕点亮。开盖与未知状态不发出熄屏命令。屏幕常亮开启时，App 立即并在整个切换期间持有系统与显示器两项 IOKit 请求（不再采样合盖状态），同时通过 `setDisplayHold` 告知 helper 暂停合盖熄屏；该保持归属于开关而非合盖会话，跨合盖会话与租期失效保留；helper 进程重启会丢失它——重启后的 helper 内存里 `displayHoldOwner` 为 nil，已实测。因此 `activate()` 在调用 `enable()` 之前先重发一次（这同时保证「屏幕常亮先开、合盖保活后开」时 helper 一进入会话就看到保持），之后每次心跳也重发。App 关闭开关或进程退出时由 App 侧释放，helper 发现进程已退出时兜底清除。App 不参与合盖熄屏请求，因此 macOS 自身的合盖显示行为不受本工具影响。
+helper 每秒检查合盖状态。仅合盖保活开启时，每次确认合盖后成功请求一次显示器休眠，失败会重试；开盖或未知状态不发出请求。新会话开始后的 5 秒是静默期，从 `enable()` 计时，不从物理合盖计时，也不是严格的熄屏时限。
+
+屏幕常亮立即持有系统与显示器两项 IOKit 闲置保活请求，不再采样合盖状态。与合盖模式的协调顺序为：
+
+| 顺序 | 行为 |
+| --- | --- |
+| 屏幕常亮先开 | App 在 `enable()` 前发送当前 `setDisplayHold`，确认后启动合盖会话 |
+| 合盖保活先开 | 屏幕开关保持处理中，先等待 helper 协调结果，再创建本地请求；等待期间可能已发生熄屏 |
+| 中继失败 | 本地闲置保活仍可工作，活动的合盖会话显示警告；不承诺阻止后续熄屏请求 |
+| 本地请求创建失败 | 回退已发送的 hold 并显示错误 |
+| 自动停止或退出 | 释放本地请求与 hold，停止监控并关闭合盖会话 |
+
+显示 hold 属于屏幕开关，跨合盖会话与租期失效保留；helper 重启会丢失内存中的 hold。App 在会话启动与每次心跳时重发，屏幕开关切换期间跳过心跳重发，避免覆盖新状态。App 退出由 helper 的进程监视兜底清除。`displaysleepnow` 不会被闲置保活请求撤销，App 也不会主动唤醒已休眠的屏幕；macOS 自身的合盖行为不受本工具影响。
 
 App 每 5 秒发出心跳，helper 的会话租期为 20 秒，同时监视 App 进程退出。root 所有的恢复标记位于 `/Library/Application Support/KeepAwakeMac/session-active`；helper 重启时尝试恢复残留的睡眠设置。其他工具已禁用睡眠时拒绝接管；这不能阻止其他工具在之后覆盖设置。
 
@@ -29,20 +42,22 @@ App 每 5 秒发出心跳，helper 的会话租期为 20 秒，同时监视 App 
 
 ## 检查
 
-先按 README 构建 Debug 版本。`scripts/check-helper.sh` 使用匿名 XPC、模拟电源命令、固定电池快照和临时 Agent 记录，不需要后台授权，也不改变真实睡眠设置。`scripts/check-menu.sh` 渲染 10 种状态，模拟菜单窗口给出 720 点高度的布局提议，确认内容不会被拉高、默认状态高度不超过 350 点；不捕获桌面、不执行真实电源操作。导出的布局 PNG 使用中性底色便于阅读，不能代替 Liquid Glass 透色的实机验收。
+安装 README 所列构建工具后执行下列检查；README 的安装示例使用 Release 配置。`scripts/check-helper.sh` 使用匿名 XPC、模拟电源命令、固定电池快照和临时 Agent 记录，不需要后台授权，也不改变真实睡眠设置。`scripts/check-menu.sh` 渲染 12 种状态，模拟菜单窗口给出 720 点高度的布局提议，确认内容不会被拉高、默认状态高度不超过 350 点；不捕获桌面、不执行真实电源操作。导出的布局 PNG 使用中性底色便于阅读，不能代替 Liquid Glass 透色的实机验收。
 
 macOS 26+ 使用 `glassEffect(.clear)`，按 Apple 文档添加 30% 黑色衬底并使用深色外观保证文字可读性，并通过 `containerBackground(.clear, for: .window)` 清除窗口原有背景，避免材质叠加。较早系统保留标准菜单材质；需要 Xcode 26+ 编译，CI 使用 Xcode 26.3。
 
-以下 Debug 诊断无需批准 root helper：
+以下诊断参数仅在 Debug 构建中启用，Release 不提供。先用 `-configuration Debug` 构建并安装对应 App；不要与常驻实例同时运行。前两项无需批准 root helper：
 
 ```bash
 /Applications/KeepAwakeMac.app/Contents/MacOS/KeepAwakeMac --check-agent-status
 /Applications/KeepAwakeMac.app/Contents/MacOS/KeepAwakeMac --check-screen-awake
 ```
 
-第一项读取本地任务状态；第二项短暂创建真实电源请求、确认后释放。运行前先退出通常运行的 App，避免混淆实例。
+第一项只读本地任务状态；第二项短暂创建真实电源请求、确认后释放。
 
-下面的诊断会注册系统服务或改变实际睡眠状态，要求 App 已安装且后台服务获批。App 会记录已登记构建的代码签名与安装路径，在更新后或迁移旧版本时先撤销旧登记，再登记当前服务；待批准状态不会反复登记。重新登记可能要求再次批准。只有同一构建的系统登记损坏时，才使用手动重新注册命令。
+Debug 版还支持 `open /Applications/KeepAwakeMac.app --args --screen-awake`：在应用未运行时启动并通过正常开关逻辑开启屏幕常亮，保留电量、温度与所选停止条件。它不是一次性检查；菜单关闭屏幕常亮或退出应用会释放请求。可用 `pmset -g assertions` 确认该应用同时持有 `PreventUserIdleSystemSleep` 和 `PreventUserIdleDisplaySleep`，不能只检查前者。
+
+下面的诊断会注册系统服务或改变实际睡眠状态，要求 App 已安装且后台服务获批。App 会记录已登记构建的代码签名与安装路径，在更新后或迁移旧版本时先撤销旧登记，再登记当前服务；只在服务已启用时查询运行中的协议版本，待批准状态不会因没有 XPC 回应而被反复登记。重新登记可能要求再次批准。只有同一构建的系统登记损坏时，才使用手动重新注册命令。
 
 ```bash
 /Applications/KeepAwakeMac.app/Contents/MacOS/KeepAwakeMac --reload-helper
@@ -54,14 +69,14 @@ launchctl print system/com.local.KeepAwakeMac.Helper
 
 `--check-keep-awake` 开启、读回、关闭并再次读回；`--check-crash-cleanup` 开启后模拟突然退出，需要另行检查系统已恢复睡眠。它们均不替代物理合盖、外接屏幕和长时间运行测试。
 
-## 本地打包
+## 本地打包与源码预发布
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 VERSION=0.1.0 bash scripts/build-dmg.sh
 ```
 
-输出为 `build/KeepAwakeMac-0.1.0-arm64.dmg` 和校验和。默认 ad-hoc 构建仅用于本地测试；脚本不上传、不创建 GitHub Release。`BUILD_DIR` 可指定输出目录；`ARCH=universal` 可构建双架构，但 Intel 运行行为尚未验证。正式分发参见[发布清单](../RELEASE_CHECKLIST.md)。
+输出为 `build/KeepAwakeMac-0.1.0-arm64.dmg` 和校验和。默认 ad-hoc 构建仅用于本地测试；脚本不上传、不创建 GitHub Release。`BUILD_DIR` 可指定输出目录；`ARCH=universal` 可构建双架构，但 Intel 运行行为尚未验证。正式分发参见[发布清单](../RELEASE_CHECKLIST.md)。源码预发布只标记源码版本，由 GitHub 提供源码归档，不上传未签名公证的 DMG。当前版本见[版本说明](releases/v0.1.0.md)。
 
 ## 提交贡献
 

@@ -34,7 +34,13 @@ enum HelperService {
                         runningProtocol: () async -> Int? = { AppConstants.helperProtocolVersion }
     ) async throws {
         let key = "helperRegistrationIdentity"
-        let stale = await runningProtocol() != AppConstants.helperProtocolVersion
+        // An unapproved service cannot answer; leave its pending registration intact.
+        let stale: Bool
+        if status() == .enabled {
+            stale = await runningProtocol() != AppConstants.helperProtocolVersion
+        } else {
+            stale = false
+        }
         let changed = defaults.string(forKey: key) != registrationID || stale
         if changed && status() != .notRegistered && status() != .notFound {
             try await unregister()

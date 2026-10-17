@@ -135,14 +135,15 @@ private final class KAMHelperSession: NSObject, KAMHelperProtocol {
 
     func setDisplayHold(_ held: Bool, reply: @escaping (Bool, String?) -> Void) {
         delegate.queue.async { [self] in
+            guard !held || kill(pid, 0) == 0 else {
+                reply(false, "The requesting app has exited."); return
+            }
+            guard delegate.controller.setDisplayHold(held, from: pid) else {
+                reply(false, "The display hold belongs to another KeepAwakeMac process."); return
+            }
             if held {
-                guard kill(pid, 0) == 0 else {
-                    reply(false, "The requesting app has exited."); return
-                }
-                delegate.controller.setDisplayHold(true, from: pid)
                 delegate.watchDisplayHold(pid)
             } else {
-                delegate.controller.setDisplayHold(false)
                 delegate.stopWatchingDisplayHold()
             }
             reply(true, nil)

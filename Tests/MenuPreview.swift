@@ -10,29 +10,6 @@ struct MenuPreview {
         let height: Int
         subscript(x: Int, y: Int) -> Int { y * width + x }
 
-        /// Every second pixel in each direction. A windowless view rasterises at the
-        /// main screen's scale while the previewed menu renders at the window's, and
-        /// glyph edges do not survive that difference intact — the match is on shape,
-        /// with a small tolerance, so the box average is enough.
-        func half() -> Image {
-            let down = width / 2
-            guard width % 2 == 0, height % 2 == 0, bytes.count >= width * height * 4 else { return self }
-            var out = [UInt8](repeating: 0, count: down * (height / 2) * 4)
-            let rowStep = width * 4
-            for y in 0..<(height / 2) {
-                for x in 0..<down {
-                    let base = ((y * 2) * width + x * 2) * 4
-                    let corners = [base, base + 4, base + rowStep, base + rowStep + 4]
-                    let target = (y * down + x) * 4
-                    for c in 0..<4 {
-                        var total = 0
-                        for corner in corners { total += Int(bytes[corner + c]) }
-                        out[target + c] = UInt8(total / 4)
-                    }
-                }
-            }
-            return Image(bytes: out, width: down, height: height / 2)
-        }
     }
 
     /// RGBA8 pixels in one fixed layout, so two renders can be compared. Both
@@ -77,8 +54,10 @@ struct MenuPreview {
         precondition(full.width == without.width,
                      "The banner changed the menu's width, not its height: \(full.width) vs \(without.width)")
         let added = full.height - without.height
-        precondition(added >= 20 && added <= 60,
-                     "The warning banner did not reach the screen as one compact block: it added \(added) points")
+        // The menu is 360 points wide; cached bitmaps can be 1x or Retina 2x.
+        let scale = Double(full.width) / 360
+        precondition(Double(added) >= 20 * scale && Double(added) <= 60 * scale,
+                     "The warning banner did not reach the screen as one compact block: it added \(Double(added) / scale) points")
         var top = 0
         while top < without.height && (0..<full.width).allSatisfy({ same(full, without, $0, top, top) }) { top += 1 }
         precondition(top < without.height,
@@ -129,15 +108,19 @@ struct MenuPreview {
             NSXPCConnection(machServiceName: "com.local.KeepAwakeMac.preview.\(UUID().uuidString)",
                             options: .privileged)
         }
-        for name in ["idle", "permission", "timer", "agent-empty", "agent-ready", "working", "error", "active", "warning", "dark", "overflow"] {
+        for name in ["idle", "permission", "timer", "agent-empty", "agent-ready", "working", "error", "active", "warning", "login-error", "dark", "overflow"] {
             let appearance = NSAppearance(named: name == "dark" ? .darkAqua : .aqua)!
             application.appearance = appearance
             let state = AppState(helper: offlineHelper, prepareHelper: { throw HelperService.ApprovalRequired() },
-                                 display: DisplayAwake(lidClosed: { false }, create: { _ in 1 }, release: { _ in }),
-                                 agentHome: home, powerSnapshot: { (100, true) })
+                                 display: DisplayAwake(create: { _ in 1 }, release: { _ in }),
+                                 agentHome: home, powerSnapshot: { (100, true) },
+                                 loginIsEnabled: { false }, setLoginEnabled: { _ in false })
             state.triggerMode = .manual; state.batteryFloorPercent = 20; state.thermalAutoStopEnabled = true
             state.timerHours = 4
             switch name {
+            case "login-error":
+                state.setLaunchAtLogin(true)
+                precondition(state.loginError != nil && !state.launchAtLogin)
             case "permission", "dark":
                 state.status = .failed(HelperService.ApprovalRequired().localizedDescription)
                 state.needsHelperApproval = true
@@ -263,7 +246,8 @@ struct MenuPreview {
         }
         let warned = try image("warning"), plain = try image("active")
         let block = insertedBlock(warned, plain)
-        let report = "warning banner on screen: \(block.height) points inserted at row \(block.top), \(block.inked) pixels of it drawn, the rows above untouched and the rows below moved down by exactly \(block.height)\n"
+        let points = block.height * 360 / warned.width
+        let report = "warning banner on screen: \(points) points inserted at row \(block.top), \(block.inked) pixels of it drawn, the rows above untouched and the rows below moved down by exactly \(points)\n"
         try report.write(to: render, atomically: true, encoding: .utf8)
         print("PASS: " + report.trimmingCharacters(in: .whitespacesAndNewlines))
     }

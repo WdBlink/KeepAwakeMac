@@ -23,11 +23,11 @@ final class LaunchAtLoginService {
                     try service.register()
                 }
             } else {
-                if service.status == .enabled {
+                if service.status != .notRegistered && service.status != .notFound {
                     try service.unregister()
                 }
             }
-            return true
+            return enabled ? isEnabled : (service.status == .notRegistered || service.status == .notFound)
         } catch {
             return false
         }

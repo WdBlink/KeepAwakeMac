@@ -114,7 +114,10 @@ final class KeepAwakeController {
     /// Turning the hold on clears the latch: a closure that already blanked the
     /// screen must not suppress the next blank once the switch goes off again.
     /// `from` is the requesting process, so a crash cannot leave the hold set.
-    func setDisplayHold(_ held: Bool, from pid: pid_t? = nil) {
+    @discardableResult
+    func setDisplayHold(_ held: Bool, from pid: pid_t? = nil) -> Bool {
+        // A hold's owner can release it across lid sessions; nil is helper cleanup.
+        if let pid, let currentOwner = displayHoldOwner ?? owner, currentOwner != pid { return false }
         if held {
             displaySleepRequested = false
             displayHold = true
@@ -123,6 +126,7 @@ final class KeepAwakeController {
             displayHold = false
             displayHoldOwner = nil
         }
+        return true
     }
 
     /// Called by the existing one-second lease timer, only during our session.

@@ -59,6 +59,15 @@ struct KeepAwakeCheck {
         expectFailure { try controller.enable(for: 456) }
         expectFailure { try controller.disable(for: 456) }
         precondition(controller.owner == 123 && enabled)
+        controller.setDisplayHold(true, from: 123)
+        controller.setDisplayHold(false, from: 456)
+        precondition(controller.displayHoldOwner == 123, "Another process must not clear the active display hold")
+        controller.setDisplayHold(true, from: 456)
+        precondition(controller.displayHoldOwner == 123, "Another process must not steal the active display hold")
+        controller.setDisplayHold(false, from: 123)
+        controller.setDisplayHold(true, from: 456)
+        precondition(controller.displayHoldOwner == nil, "Only the lid session owner can acquire a new hold")
+        print("PASS: display hold ownership isolates different app processes")
         let state = try controller.currentState(for: 123, now: 110)
         precondition(state)
         failRead = true
@@ -178,6 +187,7 @@ struct KeepAwakeCheck {
         try controller.disable()
         precondition(controller.displayHoldOwner == getpid(),
                      "A session-less disable must not drop a live screen-awake hold")
+        controller.setDisplayHold(false, from: getpid())
         let gone = Process()
         gone.executableURL = URL(fileURLWithPath: "/usr/bin/true")
         try gone.run()

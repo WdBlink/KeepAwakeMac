@@ -89,6 +89,9 @@ private final class ControllerHelper: NSObject, KAMHelperProtocol, NSXPCListener
     private(set) var holds: [Bool] = []
     private(set) var systemSleepDisabled = false
     var lidClosed: Bool? = true
+    var ticksBeforeHold = 0
+    var ticksAfterEnable = 0
+    var onDisplaySleep: (() -> Void)?
     /// A fake uptime, advanced one second per lease tick, so the helper's
     /// settling window is exercised without waiting five real seconds.
     private(set) var now: TimeInterval = 0
@@ -96,13 +99,18 @@ private final class ControllerHelper: NSObject, KAMHelperProtocol, NSXPCListener
     override init() {
         marker = FileManager.default.temporaryDirectory
             .appendingPathComponent("check-controller-\(UUID().uuidString)")
+            .appendingPathComponent("active")
         super.init()
     }
 
     private lazy var controller: KeepAwakeController = {
         let marker = self.marker
         return KeepAwakeController(marker: marker, run: { [unowned self] arguments in
-            if arguments == ["displaysleepnow"] { displaySleeps += 1; return "" }
+            if arguments == ["displaysleepnow"] {
+                onDisplaySleep?()
+                displaySleeps += 1
+                return ""
+            }
             precondition(arguments == ["-a", "disablesleep", "1"] || arguments == ["-a", "disablesleep", "0"],
                          "Unexpected power command: \(arguments)")
             if arguments.last == "1" {
@@ -145,6 +153,10 @@ private final class ControllerHelper: NSObject, KAMHelperProtocol, NSXPCListener
         queue.async {
             do {
                 try self.controller.enable(for: ProcessInfo.processInfo.processIdentifier, now: self.now)
+                for _ in 0..<self.ticksAfterEnable {
+                    self.now += 1
+                    _ = try self.controller.sleepDisplayIfLidClosed(now: self.now)
+                }
                 self.sessions += 1
                 reply(true, nil)
             } catch { reply(false, error.localizedDescription) }
@@ -167,8 +179,17 @@ private final class ControllerHelper: NSObject, KAMHelperProtocol, NSXPCListener
 
     func setDisplayHold(_ held: Bool, reply: @escaping (Bool, String?) -> Void) {
         queue.async {
+            if held {
+                for _ in 0..<self.ticksBeforeHold {
+                    self.now += 1
+                    _ = try? self.controller.sleepDisplayIfLidClosed(now: self.now)
+                }
+                self.ticksBeforeHold = 0
+            }
             self.holds.append(held)
-            self.controller.setDisplayHold(held, from: ProcessInfo.processInfo.processIdentifier)
+            guard self.controller.setDisplayHold(held, from: ProcessInfo.processInfo.processIdentifier) else {
+                reply(false, "The display hold belongs to another KeepAwakeMac process."); return
+            }
             reply(true, nil)
         }
     }
@@ -180,6 +201,35 @@ private final class ControllerHelper: NSObject, KAMHelperProtocol, NSXPCListener
 
 @main
 struct HelperClientCheck {
+    @MainActor
+    static func checkLoginSetting() {
+        let defaults = UserDefaults.standard
+        let saved = defaults.object(forKey: "launchAtLogin")
+        defer {
+            if let saved { defaults.set(saved, forKey: "launchAtLogin") }
+            else { defaults.removeObject(forKey: "launchAtLogin") }
+        }
+        var actual = false
+        var allowed = false
+        defaults.set(true, forKey: "launchAtLogin")
+        let app = AppState(loginIsEnabled: { actual }, setLoginEnabled: { enabled in
+            guard allowed else { return false }
+            actual = enabled
+            return true
+        })
+        precondition(!app.launchAtLogin, "Read the system service, not a stale saved preference")
+        app.setLaunchAtLogin(true)
+        precondition(!app.launchAtLogin && !actual && !defaults.bool(forKey: "launchAtLogin") && app.loginError != nil)
+        allowed = true
+        app.setLaunchAtLogin(true)
+        precondition(app.launchAtLogin && actual && defaults.bool(forKey: "launchAtLogin") && app.loginError == nil)
+        allowed = false
+        app.setLaunchAtLogin(false)
+        precondition(app.launchAtLogin && actual && defaults.bool(forKey: "launchAtLogin") && app.loginError != nil,
+                     "Failed unregistration must not claim the login item was disabled")
+        print("PASS: login setting reflects system state, rolls back failures, and clears errors on success")
+    }
+
     @MainActor
     static func checkServiceRegistration() async throws {
         let suite = "KeepAwakeMac.registration-check.\(UUID().uuidString)"
@@ -251,6 +301,13 @@ struct HelperClientCheck {
         try await negotiate("build-3", nil)
         precondition(registrations == 5 && removals == 5,
                      "An unreachable helper cannot be trusted to match this contract")
+        status = .requiresApproval
+        for _ in 0..<2 {
+            do { try await negotiate("build-3", nil); fatalError("Pending approval was replaced by another registration") }
+            catch is HelperService.ApprovalRequired {}
+        }
+        precondition(registrations == 5 && removals == 5,
+                     "An unapproved helper cannot answer a protocol probe; preserve its pending registration")
         print("PASS: stale service repair, build changes, helper version skew, failure retry, and pending approval")
     }
 
@@ -266,6 +323,7 @@ struct HelperClientCheck {
 
     @MainActor
     static func main() async throws {
+        checkLoginSetting()
         try await checkServiceRegistration()
         // Also bounds failures of the regression itself (e.g. a leaked continuation).
         DispatchQueue.global().asyncAfter(deadline: .now() + 30) {
@@ -386,6 +444,28 @@ struct HelperClientCheck {
         helper.holdGate = nil
         precondition(helper.displayHold == false && !prompt.screenAwake && live == 0)
         print("PASS: turning the switch off releases the screen without waiting for the helper")
+
+        await prompt.setScreenAwake(true)
+        helper.holds = []
+        helper.holdGate = gate
+        let stopping = Task { await prompt.deactivate(reason: "Automatic stop regression") }
+        for _ in 0..<200 where helper.holds.isEmpty {
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+        precondition(!helper.holds.isEmpty && prompt.isBusy,
+                     "Automatic stop must stay busy while the helper relay is pending")
+        await prompt.setScreenAwake(true)
+        await prompt.activate()
+        precondition(!prompt.screenAwake && live == 0 && prompt.status == .idle,
+                     "A new awake session must not start during automatic stop")
+        gate.signal()
+        await stopping.value
+        helper.holdGate = nil
+        precondition(!prompt.isBusy && !prompt.screenAwake && live == 0)
+        await prompt.setScreenAwake(true)
+        precondition(prompt.screenAwake && live == 2, "A fresh session must work after stop finishes")
+        await prompt.setScreenAwake(false)
+        print("PASS: automatic stop blocks restart until cleanup finishes, then permits a fresh session")
 
         helper.behavior = .lateReply
         helper.replyDelay = 5.2
@@ -559,7 +639,7 @@ struct HelperClientCheck {
     /// 屏幕常亮 was flipped first.
     @MainActor
     static func checkSwitchOrderings() async throws {
-        for ordering in ["屏幕常亮 → 合盖保活", "合盖保活 → 屏幕常亮", "合盖保活 长开 → 屏幕常亮"] {
+        for ordering in ["屏幕常亮 → 合盖保活", "合盖保活 → 屏幕常亮", "合盖保活 长开 → 屏幕常亮", "合盖保活 → 慢中继 → 屏幕常亮"] {
             let power = ControllerHelper()
             let listener = NSXPCListener.anonymous()
             listener.delegate = power
@@ -568,13 +648,23 @@ struct HelperClientCheck {
                 NSXPCConnection(listenerEndpoint: listener.endpoint)
             }
             var held = 0
+            var failDisplay = false
+            power.onDisplaySleep = {
+                precondition(held == 0, "\(ordering): helper blanked after display assertions were acquired")
+            }
             let app = AppState(helper: client, prepareHelper: {},
-                               display: DisplayAwake(create: { _ in held += 1; return 1 },
+                               display: DisplayAwake(create: { _ in
+                                   if failDisplay { throw KeepAwakeController.Failure("Simulated assertion failure") }
+                                   held += 1; return 1
+                               },
                                                      release: { _ in held -= 1 }),
                                powerSnapshot: { (100, true) })
             app.triggerMode = .manual; app.batteryFloorPercent = 5; app.thermalAutoStopEnabled = false
 
-            if ordering.hasPrefix("屏幕常亮") { await app.setScreenAwake(true) }
+            if ordering.hasPrefix("屏幕常亮") {
+                await app.setScreenAwake(true)
+                power.ticksAfterEnable = 6
+            }
             await app.activate()
             precondition(app.status == .active, "\(ordering): the lid session did not start")
             if ordering.hasPrefix("合盖保活 长开") {
@@ -587,14 +677,23 @@ struct HelperClientCheck {
             } else if !ordering.hasPrefix("屏幕常亮") {
                 // The user is still mid-menu when the first ticks land.
                 await power.ticks(2)
+                if ordering.contains("慢中继") { power.ticksBeforeHold = 6 }
                 await app.setScreenAwake(true)
             }
             await power.ticks(8)
             precondition(app.screenAwake && held == 2, "\(ordering): the switch did not stay on")
-            let expected = ordering.hasPrefix("合盖保活 长开") ? 1 : 0
+            let expected = ordering.hasPrefix("合盖保活 长开") || ordering.contains("慢中继") ? 1 : 0
             precondition(power.displaySleeps == expected,
                          "\(ordering): helper blanked the display \(power.displaySleeps) time(s), want \(expected)")
             print("PASS: \(ordering) — lid closed, \(power.displaySleeps) blank(s), screen-awake on")
+            if ordering.contains("慢中继") {
+                await app.setScreenAwake(false)
+                failDisplay = true
+                await app.setScreenAwake(true)
+                precondition(!app.screenAwake && held == 0 && app.screenError != nil && power.holds.last == false,
+                             "An assertion failure must release the helper hold")
+                print("PASS: assertion failure rolls back the coordinated display hold")
+            }
             await app.deactivate(reason: "End of ordering check")
             listener.invalidate()
             power.cleanUp()

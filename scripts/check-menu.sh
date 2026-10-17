@@ -12,10 +12,10 @@ xcrun swiftc -swift-version 5 -parse-as-library \
   Tests/MenuPreview.swift -o "$CHECK_DIR/menu-preview"
 "$CHECK_DIR/menu-preview" "$OUT"
 
-# Every state the menu can be in has to render, including the one the review
-# called out: an eleventh state with screenWarning set. A missing render is a
+# Every state the menu can be in has to render, including screenWarning and
+# login-item registration failures. A missing render is a
 # silent skip, so the count is asserted rather than globbed.
-expected=(idle permission timer agent-empty agent-ready working error active warning dark overflow)
+expected=(idle permission timer agent-empty agent-ready working error active warning login-error dark overflow)
 for state in "${expected[@]}"; do
   [[ -s "$OUT/$state.png" ]] || { echo "FAIL: $state rendered no menu"; exit 1; }
 done

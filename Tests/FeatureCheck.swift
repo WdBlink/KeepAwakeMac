@@ -33,7 +33,7 @@ enum FeatureCheck {
             }
             precondition(found > 0, "The copy scan reached no files in \(directory); the root is probably wrong")
         }
-        for name in ["README.md", "RELEASE_CHECKLIST.md", "SECURITY.md"] {
+        for name in ["README.md", "README.en.md", "RELEASE_CHECKLIST.md", "SECURITY.md"] {
             let url = root.appendingPathComponent(name)
             precondition(fm.fileExists(atPath: url.path), "The copy scan cannot see \(name)")
             files.append(url)
